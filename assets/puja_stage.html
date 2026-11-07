@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Lakshmi Pujan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Devanagari+Hindi&family=Cinzel:wght@600;700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; height:100%; background:#140303; overflow:hidden;
+    font-family:'Poppins',system-ui,sans-serif; color:#ffe9b0; }
+  #wrap { position:relative; width:100%; height:100%; display:flex; flex-direction:column; }
+  #bar { flex:0 0 auto; display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;
+    padding:6px 10px; background:linear-gradient(90deg,#3b0a0a,#6a1a12,#3b0a0a);
+    border-bottom:1px solid #c9952b; box-shadow:0 2px 10px rgba(0,0,0,.5); }
+  #bar button { background:linear-gradient(#ffd977,#d99a1e); color:#4a1204; border:1px solid #ffe7a3;
+    border-radius:18px; padding:5px 14px; font-weight:600; font-family:inherit; cursor:pointer; font-size:13px; }
+  #bar button:hover { filter:brightness(1.08); }
+  #bar button.ghost { background:transparent; color:#ffe1a0; border-color:#c9952b; }
+  #bar .lbl { font-size:12px; opacity:.85; }
+  #seek { width:160px; accent-color:#ffbf3c; }
+  #vol { width:80px; accent-color:#ffbf3c; }
+  #camStatus { font-size:12px; padding:3px 10px; border-radius:12px; background:rgba(0,0,0,.35); border:1px solid #7a5517; }
+  #stageBox { position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
+  canvas { display:block; border-radius:10px; box-shadow:0 0 30px rgba(255,170,40,.25); touch-action:none; cursor:crosshair; }
+  #overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(60,10,5,.88), rgba(10,2,2,.96)); z-index:5; text-align:center; padding:20px; }
+  #overlay h1 { font-family:'Tiro Devanagari Hindi',serif; font-size:44px; margin:0; color:#ffd36b;
+    text-shadow:0 0 18px rgba(255,180,40,.8); font-weight:400; }
+  #overlay h2 { font-family:'Cinzel',serif; margin:6px 0 18px; letter-spacing:3px; font-size:18px; color:#ffe9b0; }
+  #overlay .credit { margin:-8px 0 18px; font-size:14px; font-style:italic; color:#ffd36b; letter-spacing:.5px; }
+  #overlay p { max-width:620px; font-size:14px; line-height:1.6; opacity:.9; margin:0 0 18px; }
+  #overlay .btns { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  #overlay button { font-size:16px; padding:12px 26px; border-radius:28px; cursor:pointer; font-family:inherit; font-weight:600;
+    background:linear-gradient(#ffe08a,#e0a020); color:#4a1204; border:2px solid #fff0c0; box-shadow:0 0 18px rgba(255,190,60,.6); }
+  #overlay button.alt { background:transparent; color:#ffe1a0; border-color:#c9952b; box-shadow:none; }
+  #overlay small { margin-top:16px; opacity:.65; font-size:12px; max-width:620px; }
+  video { display:none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="bar">
+    <button id="btnPlay">▶ Play Bhajan</button>
+    <button id="btnStop" class="ghost">⏹</button>
+    <input id="seek" type="range" min="0" max="1000" value="0" title="Seek">
+    <span class="lbl" id="tlabel">0:00 / 0:00</span>
+    <span class="lbl">🔊</span><input id="vol" type="range" min="0" max="100" value="80" title="Volume">
+    <button id="btnBell" class="ghost">🔔 Ghanti</button>
+    <button id="btnReset" class="ghost">↺ Reset Puja</button>
+    <button id="btnFull" class="ghost">⛶ Fullscreen</button>
+    <span id="camStatus">📷 Camera off</span>
+  </div>
+  <div id="stageBox">
+    <canvas id="stage"></canvas>
+    <div id="overlay">
+      <h1>॥ श्री लक्ष्मी पूजन ॥</h1>
+      <h2>DIGITAL DIWALI PUJA</h2>
+      <div class="credit">Conceptualized and Developed by <b>CA Alok Sethi</b> using Claude</div>
+      <p>Raise your hand in front of the camera. <b>Pinch</b> (touch thumb and index finger together) to pick up
+        the candle, the thali or a flower, and <b>open your fingers</b> to let go.<br>
+        Light the diyas, offer flowers to Lakshmi ji, and circle the thali for the aarti.</p>
+      <div class="btns">
+        <button id="btnCam">📷 Begin Puja with Camera</button>
+        <button id="btnMouse" class="alt">🖱️ Use Mouse / Touch only</button>
+      </div>
+      <small>Your camera feed is processed entirely inside your browser and is never uploaded or stored.
+        Hand tracking needs an internet connection the first time (it loads Google MediaPipe from a CDN).</small>
+    </div>
+  </div>
+  <video id="cam" playsinline muted></video>
+  <audio id="bhajan" preload="auto"></audio>
+</div>
+
+<script>
+/*__PUJA_CONFIG__*/
+</script>
+<script>
+"use strict";
+// ---------------------------------------------------------------------------
+// Config (injected by app.py). Defaults keep the page usable standalone.
+// ---------------------------------------------------------------------------
+const CFG = Object.assign({
+  lakshmi: null, audio: null, audioName: "", name: "", diyas: 5, flowersNeeded: 5,
+  aartiRounds: 3, pinch: 0.35, showCam: true, camBg: false, skeleton: true, sfx: true,
+  loop: true, mirror: true, smooth: 0.45
+}, (typeof CONFIG !== "undefined") ? CONFIG : {});
+
+const MP_VER = "0.10.14";
+const MP_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@" + MP_VER;
+const MP_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+const W = 1280, H = 720, TAU = Math.PI * 2;
+const cv = document.getElementById("stage");
+const ctx = cv.getContext("2d");
+cv.width = W; cv.height = H;
+const video = document.getElementById("cam");
+const audioEl = document.getElementById("bhajan");
+const hasAudio = !!CFG.audio;
+if (hasAudio) { audioEl.src = CFG.audio; audioEl.loop = !!CFG.loop; }
+
+// Scene layout (logical 1280x720 coordinates)
+const LK = { x: 640, y: 305, w: 290, h: 340 };            // Lakshmi ji frame
+const THALI_HOME = { x: 640, y: 600 };
+const CANDLE_HOME = { x: 205, y: 610 };
+const BASKET = { x: 1095, y: 625 };
+const BHAJAN = { x: 1095, y: 430, r: 46 };
+const BELL = { x: 345, y: 205 };
+const PIP = { x: 1062, y: 16, w: 200, h: 150 };
+
+const lakshmiImg = new Image();
+let lakshmiReady = false;
+if (CFG.lakshmi) { lakshmiImg.onload = () => { lakshmiReady = true; }; lakshmiImg.src = CFG.lakshmi; }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const rand = (a, b) => a + Math.random() * (b - a);
+const lerp = (a, b, t) => a + (b - a) * t;
+function rr(x, y, w, h, r) {           // rounded-rect path
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function inLakshmi(p, pad = 40) {
+  return p.x > LK.x - LK.w / 2 - pad && p.x < LK.x + LK.w / 2 + pad && p.y > LK.y - LK.h / 2 - pad && p.y < LK.y + LK.h / 2 + pad;
+}
+
+// ---------------------------------------------------------------------------
+// Sound (Web Audio synthesis: temple bell + ambient drone fallback)
+// ---------------------------------------------------------------------------
+let AC = null;
+function ensureAC() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === "suspended") AC.resume();
+  return AC;
+}
+function bell(freq = 880, dur = 2.4, vol = 0.22) {
+  if (!CFG.sfx) return;
+  const ac = ensureAC(); if (!ac) return;
+  const t = ac.currentTime, master = ac.createGain();
+  master.gain.value = vol; master.connect(ac.destination);
+  [1, 2.76, 5.4, 8.93].forEach((m, i) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine"; o.frequency.value = freq * m;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1 / (i + 1), t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur / (i + 1));
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+  });
+}
+let drone = null;
+function toggleDrone() {
+  const ac = ensureAC(); if (!ac) return false;
+  if (drone) {
+    const d = drone; drone = null;
+    d.gain.gain.setTargetAtTime(0.0001, ac.currentTime, 0.4);
+    setTimeout(() => d.oscs.forEach(o => o.stop()), 1500);
+    return false;
+  }
+  const gain = ac.createGain(); gain.gain.value = 0.0001;
+  const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
+  lp.connect(gain); gain.connect(ac.destination);
+  const oscs = [130.81, 196.0, 261.63, 130.81 * 1.003].map((f, i) => {
+    const o = ac.createOscillator(); o.type = i === 3 ? "sine" : "sawtooth"; o.frequency.value = f;
+    const g = ac.createGain(); g.gain.value = i === 3 ? 0.5 : 0.18;
+    const lfo = ac.createOscillator(), lg = ac.createGain();
+    lfo.frequency.value = 0.15 + i * 0.07; lg.gain.value = 0.08; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    o.connect(g); g.connect(lp); o.start(); return o;
+  });
+  gain.gain.setTargetAtTime(0.09, ac.currentTime, 0.8);
+  drone = { gain, oscs };
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+let S;
+const diyaCount = clamp(parseInt(CFG.diyas) || 5, 1, 11);
+function resetPuja() {
+  S = {
+    thali: { x: THALI_HOME.x, y: THALI_HOME.y, r: 86, heldBy: null, glow: 0 },
+    candle: { x: CANDLE_HOME.x, y: CANDLE_HOME.y, heldBy: null },
+    diyas: Array.from({ length: diyaCount }, (_, i) => ({ ang: -Math.PI / 2 + i * TAU / diyaCount, lit: false, litT: 0 })),
+    offered: [], falling: [], particles: [], trail: [],
+    aarti: { total: 0, last: null },
+    steps: { touch: false, flowers: 0, aarti: 0, bhajan: false },
+    done: false, doneT: 0, toast: null, bellSwing: 0, bellLast: 0, floorLit: 0
+  };
+}
+resetPuja();
+const litCount = () => S.diyas.filter(d => d.lit).length;
+const allLit = () => litCount() === S.diyas.length;
+function toast(text, dur = 2600) { S.toast = { text, t0: performance.now(), dur }; }
+
+function diyaScale() { return diyaCount <= 5 ? 1 : diyaCount <= 7 ? 0.85 : 0.66; }
+function diyaPos(d) {
+  const r = 55, t = S.thali;
+  return { x: t.x + Math.cos(d.ang) * r, y: t.y + Math.sin(d.ang) * r * 0.92 };
+}
+function wickPos(d) { const p = diyaPos(d), s = diyaScale(); return { x: p.x + 15 * s, y: p.y - 7 * s }; }
+function flamePos() { return { x: S.candle.x, y: S.candle.y - 98 }; }
+
+// Particles
+function burst(x, y, n, palette = "gold", speed = 3.2) {
+  const pals = {
+    gold: ["#fff3b0", "#ffd54f", "#ffb300", "#ff8f00"],
+    fire: ["#fff59d", "#ff7043", "#ff4081", "#7c4dff", "#40c4ff", "#69f0ae", "#ffd740"],
+    petal: ["#ff6f00", "#ffa000", "#e53935", "#f06292", "#ffd54f"]
+  };
+  const cols = pals[palette] || pals.gold;
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), v = rand(0.4, 1) * speed;
+    S.particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - (palette === "petal" ? 1 : 0),
+      life: 0, max: rand(40, 80), c: cols[i % cols.length], s: rand(1.5, 3.5),
+      kind: palette === "petal" ? "petal" : "spark", rot: rand(0, TAU), g: palette === "fire" ? 0.04 : 0.06 });
+  }
+}
+function rain(kind, n) {
+  for (let i = 0; i < n; i++) S.particles.push({ x: rand(0, W), y: rand(-60, -10), vx: rand(-0.6, 0.6), vy: rand(1, 2.6),
+    life: 0, max: 400, c: kind === "coin" ? "#ffcc33" : ["#ff6f00", "#ffa000", "#e53935", "#f06292"][i % 4],
+    s: kind === "coin" ? rand(6, 9) : rand(3, 5), kind, rot: rand(0, TAU), g: 0.01 });
+}
+
+// ---------------------------------------------------------------------------
+// Cursors (hands + mouse)
+// ---------------------------------------------------------------------------
+const cursors = {};
+function newCursor(id) {
+  return { id, x: W / 2, y: H / 2, pinch: false, wasPinch: false, hold: null, off: { x: 0, y: 0 },
+    visible: false, lastSeen: 0, lm: null, tips: null, dwell: { target: null, t0: 0, fired: false }, inBell: false };
+}
+cursors.mouse = newCursor("mouse");
+
+function toLogical(e) {
+  const r = cv.getBoundingClientRect();
+  const p = e.touches && e.touches.length ? e.touches[0] : e;
+  return { x: (p.clientX - r.left) / r.width * W, y: (p.clientY - r.top) / r.height * H };
+}
+function onDown(e) { ensureAC(); const m = cursors.mouse, p = toLogical(e); m.x = p.x; m.y = p.y; m.visible = true; m.pinch = true; e.preventDefault(); }
+function onMove(e) { const m = cursors.mouse, p = toLogical(e); m.x = p.x; m.y = p.y; m.visible = true; if (e.touches) e.preventDefault(); }
+function onUp() { cursors.mouse.pinch = false; }
+cv.addEventListener("mousedown", onDown); window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
+cv.addEventListener("mouseleave", () => { if (!cursors.mouse.pinch) cursors.mouse.visible = false; });
+cv.addEventListener("touchstart", onDown, { passive: false }); cv.addEventListener("touchmove", onMove, { passive: false });
+cv.addEventListener("touchend", onUp);
+
+const FLOWER_TYPES = ["marigold", "rose", "lotus", "marigold", "jasmine"];
+
+function tryGrab(c0, now) {
+  // hit-test at the raw (unsmoothed) hand position so fast moves + pinch grab the right object
+  const c = { x: c0.rx != null ? c0.rx : c0.x, y: c0.ry != null ? c0.ry : c0.y, id: c0.id };
+  const grab = (hold, obj) => { c0.hold = hold; c0.off = obj ? { x: obj.x - c0.x, y: obj.y - c0.y } : { x: 0, y: 0 }; };
+  if (dist(c, BHAJAN) < BHAJAN.r + 6) { toggleBhajan(); return; }
+  if (dist(c, BELL) < 48) { ringBell(now, true); return; }
+  const cd = S.candle;
+  if (!cd.heldBy && Math.abs(c.x - cd.x) < 36 && c.y > cd.y - 130 && c.y < cd.y + 18) {
+    cd.heldBy = c.id; grab({ type: "candle" }, cd); return;
+  }
+  const th = S.thali;
+  if (!th.heldBy && dist(c, th) < th.r + 8) {
+    th.heldBy = c.id; grab({ type: "thali" }, th);
+    if (litCount() > 0) toast("🪔 Now circle the thali around Lakshmi ji for the aarti");
+    return;
+  }
+  if (Math.abs(c.x - BASKET.x) < 95 && Math.abs(c.y - BASKET.y) < 70) {
+    grab({ type: "flower", f: { type: FLOWER_TYPES[Math.floor(Math.random() * FLOWER_TYPES.length)], rot: rand(0, TAU) } }, null);
+  }
+}
+function release(c, now) {
+  const h = c.hold; if (!h) return;
+  if (h.type === "candle") S.candle.heldBy = null;
+  else if (h.type === "thali") { S.thali.heldBy = null; S.aarti.last = null; }
+  else if (h.type === "flower") {
+    if (inLakshmi(c, 30)) {
+      S.offered.push({ x: clamp(c.x, LK.x - LK.w / 2 - 20, LK.x + LK.w / 2 + 20), y: clamp(c.y, LK.y - LK.h / 2 - 20, LK.y + LK.h / 2 + 30),
+        type: h.f.type, rot: h.f.rot, t: now });
+      S.steps.flowers++;
+      burst(c.x, c.y, 18, "petal", 2.4);
+      bell(1568, 1.2, 0.12);
+      const need = CFG.flowersNeeded;
+      toast(S.steps.flowers >= need ? "🌸 Pushpanjali complete — Lakshmi ji is pleased!" : `🌼 Flower offered (${S.steps.flowers}/${need})`);
+    } else {
+      S.falling.push({ x: c.x, y: c.y, vx: rand(-1, 1), vy: 0, type: h.f.type, rot: h.f.rot, vr: rand(-0.1, 0.1), life: 0 });
+    }
+  }
+  c.hold = null;
+}
+function ringBell(now, force) {
+  if (!force && now - S.bellLast < 700) return;
+  S.bellLast = now; S.bellSwing = 1; bell(740, 3.2, 0.25);
+}
+function toggleBhajan() {
+  ensureAC();
+  if (hasAudio) {
+    if (audioEl.paused) audioEl.play().catch(() => toast("Click ▶ Play Bhajan in the top bar to allow audio"));
+    else audioEl.pause();
+  } else {
+    const on = toggleDrone();
+    if (on) { S.steps.bhajan = true; toast("🎶 Ambient drone on (upload a bhajan from the sidebar to play it here)"); }
+    updatePlayBtn();
+  }
+}
+
+function processCursor(c, now) {
+  const startPinch = c.pinch && !c.wasPinch, endPinch = !c.pinch && c.wasPinch;
+  c.wasPinch = c.pinch;
+  // "Touch the thali"
+  if (dist(c, S.thali) < S.thali.r) {
+    S.thali.glow = 1;
+    if (!S.steps.touch) {
+      S.steps.touch = true; burst(S.thali.x, S.thali.y, 30, "gold"); bell(1046, 1.8, 0.16);
+      toast("🙏 Thali touched — the puja begins. Pick up the candle 🕯️ and light the diyas");
+    }
+  }
+  if (startPinch && !c.hold) tryGrab(c, now);
+  if (endPinch && c.hold) release(c, now);
+  if (c.hold) {
+    const tx = c.x + c.off.x, ty = c.y + c.off.y;
+    if (c.hold.type === "candle") { S.candle.x = lerp(S.candle.x, clamp(tx, 20, W - 20), 0.7); S.candle.y = lerp(S.candle.y, clamp(ty, 120, H + 20), 0.7); }
+    if (c.hold.type === "thali") { S.thali.x = lerp(S.thali.x, clamp(tx, 60, W - 60), 0.6); S.thali.y = lerp(S.thali.y, clamp(ty, 60, H - 40), 0.6); }
+  }
+  // Bell: ring when a hand sweeps into it
+  const inB = dist(c, BELL) < 44;
+  if (inB && !c.inBell && c.id !== "mouse") ringBell(now, false);
+  c.inBell = inB;
+  // Dwell (hover ~1s) on the bhajan button, for hands only
+  if (c.id !== "mouse" && !c.hold) {
+    const tgt = dist(c, BHAJAN) < BHAJAN.r ? "bhajan" : null;
+    if (tgt !== c.dwell.target) { c.dwell = { target: tgt, t0: now, fired: false }; }
+    else if (tgt && !c.dwell.fired && now - c.dwell.t0 > 1000) { c.dwell.fired = true; toggleBhajan(); }
+  } else c.dwell = { target: null, t0: 0, fired: false };
+}
+
+// ---------------------------------------------------------------------------
+// Hand tracking (MediaPipe Tasks Vision, runs locally in the browser)
+// ---------------------------------------------------------------------------
+let landmarker = null, lastVT = -1, lastResult = null;
+const camStatus = document.getElementById("camStatus");
+function setCam(t) { camStatus.textContent = t; }
+async function initCamera() {
+  try {
+    setCam("📷 Requesting camera…");
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" }, audio: false });
+    video.srcObject = stream; await video.play();
+    setCam("🧠 Loading hand tracker…");
+    const vision = await import(MP_CDN + "/vision_bundle.mjs");
+    const fileset = await vision.FilesetResolver.forVisionTasks(MP_CDN + "/wasm");
+    const opts = (delegate) => ({ baseOptions: { modelAssetPath: MP_MODEL, delegate }, runningMode: "VIDEO", numHands: 2,
+      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+    try { landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts("GPU")); }
+    catch (e) { landmarker = await vision.HandLandmarker.createFromOptions(fileset, opts("CPU")); }
+    setCam("✋ Hand tracking ON");
+    toast("✋ Show your hand — pinch to pick things up");
+  } catch (err) {
+    console.error(err);
+    const msg = (err && err.name === "NotAllowedError") ? "Camera permission denied" : (err && err.name === "NotFoundError") ? "No camera found" : "Camera / tracker failed";
+    setCam("⚠️ " + msg + " — mouse mode");
+    toast("⚠️ " + msg + ". You can still do the puja with the mouse or touch.", 5000);
+  }
+}
+function mapLm(p) {
+  const M = 0.1, mx = CFG.mirror ? 1 - p.x : p.x;
+  return { x: clamp((mx - M) / (1 - 2 * M), 0, 1) * W, y: clamp((p.y - M) / (1 - 2 * M), 0, 1) * H };
+}
+function updateHands(res, now) {
+  const seen = new Set();
+  if (res && res.landmarks) {
+    res.landmarks.forEach((lm, i) => {
+      const hd = res.handedness && res.handedness[i] && res.handedness[i][0];
+      let id = hd ? hd.categoryName : "hand" + i;
+      if (seen.has(id)) id += "2";
+      seen.add(id);
+      const c = cursors[id] || (cursors[id] = newCursor(id));
+      const a = mapLm(lm[4]), b = mapLm(lm[8]);
+      const tx = (a.x + b.x) / 2, ty = (a.y + b.y) / 2;
+      if (!c.visible) { c.x = tx; c.y = ty; } else { c.x += (tx - c.x) * CFG.smooth; c.y += (ty - c.y) * CFG.smooth; }
+      const asp = (video.videoWidth / video.videoHeight) || 4 / 3;
+      const pd = Math.hypot((lm[4].x - lm[8].x) * asp, lm[4].y - lm[8].y);
+      const hs = Math.hypot((lm[0].x - lm[9].x) * asp, lm[0].y - lm[9].y) || 0.1;
+      const ratio = pd / hs;
+      if (c.pinch) { if (ratio > CFG.pinch + 0.12) c.pinch = false; } else if (ratio < CFG.pinch) c.pinch = true;
+      c.rx = tx; c.ry = ty; c.lm = lm; c.tips = [a, b]; c.visible = true; c.lastSeen = now;
+    });
+  }
+  for (const id in cursors) {
+    const c = cursors[id];
+    if (id !== "mouse" && c.visible && now - c.lastSeen > 400) {
+      c.visible = false; c.pinch = false; c.wasPinch = false; if (c.hold) release(c, now);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Drawing: environment
+// ---------------------------------------------------------------------------
+function drawBackground(t) {
+  const g = ctx.createRadialGradient(LK.x, LK.y, 40, LK.x, LK.y, 900);
+  const glow = 0.25 + 0.5 * (litCount() / S.diyas.length);
+  g.addColorStop(0, `rgba(${150 + 60 * glow | 0},${40 + 40 * glow | 0},20,1)`);
+  g.addColorStop(0.45, "#4a0d0b"); g.addColorStop(1, "#160303");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // rotating mandala
+  ctx.save(); ctx.translate(LK.x, LK.y); ctx.rotate(t * 0.00005);
+  ctx.strokeStyle = "rgba(255,200,90,0.09)"; ctx.lineWidth = 1.5;
+  for (let ring = 0; ring < 5; ring++) {
+    const R = 150 + ring * 55, n = 12 + ring * 6;
+    for (let i = 0; i < n; i++) {
+      ctx.save(); ctx.rotate(i * TAU / n); ctx.translate(0, -R);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(12, -22, 0, -40); ctx.quadraticCurveTo(-12, -22, 0, 0); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
+  }
+  ctx.restore();
+  // floor
+  const fg = ctx.createLinearGradient(0, 560, 0, H);
+  fg.addColorStop(0, "rgba(40,8,4,0)"); fg.addColorStop(1, "rgba(25,5,2,0.85)");
+  ctx.fillStyle = fg; ctx.fillRect(0, 560, W, H - 560);
+}
+function drawCamBackground() {
+  if (!CFG.camBg || video.readyState < 2) return;
+  ctx.save(); ctx.globalAlpha = 0.16;
+  if (CFG.mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, 0, 0, W, H); ctx.restore();
+}
+function drawFairyLights(t) {
+  const cols = ["#ffeb3b", "#ff5252", "#40c4ff", "#69f0ae", "#ff80ab", "#ffab40"];
+  ctx.strokeStyle = "rgba(60,30,10,0.9)"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 10) { const y = 100 + Math.sin(x / W * Math.PI * 4) * 12; x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke();
+  for (let i = 0, x = 20; x < W; x += 42, i++) {
+    const y = 100 + Math.sin(x / W * Math.PI * 4) * 12 + 6;
+    const on = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.004 + i * 1.7));
+    ctx.globalAlpha = on;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 14); g.addColorStop(0, cols[i % 6]); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 14, 0, TAU); ctx.fill();
+    ctx.fillStyle = cols[i % 6]; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+function drawToran() {
+  // rope
+  ctx.strokeStyle = "#7a3b0c"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(W, 8); ctx.stroke();
+  // mango leaves along the rope
+  for (let x = 20; x < W; x += 40) {
+    ctx.save(); ctx.translate(x, 10); ctx.rotate(Math.sin(x) * 0.15);
+    const g = ctx.createLinearGradient(0, 0, 0, 34); g.addColorStop(0, "#2e7d32"); g.addColorStop(1, "#7cb342");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-7, 0); ctx.quadraticCurveTo(-9, 22, 0, 36); ctx.quadraticCurveTo(9, 22, 7, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(20,60,20,.6)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, 32); ctx.stroke();
+    ctx.restore();
+  }
+  // marigold strands
+  for (let x = 0, k = 0; x <= W; x += 64, k++) {
+    const n = (k % 2 ? 7 : 10);
+    for (let i = 0; i < n; i++) {
+      const y = 14 + i * 9.5;
+      ctx.fillStyle = i % 2 ? "#ffb300" : "#ef6c00";
+      ctx.beginPath(); ctx.arc(x, y, 6.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(120,40,0,.35)"; ctx.beginPath(); ctx.arc(x + 1.5, y + 1.5, 2.5, 0, TAU); ctx.fill();
+    }
+  }
+}
+function drawMandap() {
+  const pg = ctx.createLinearGradient(0, 0, 30, 0);
+  pg.addColorStop(0, "#8a5a10"); pg.addColorStop(0.5, "#ffd56a"); pg.addColorStop(1, "#8a5a10");
+  [430, 850].forEach(px => {
+    ctx.save(); ctx.translate(px - 15, 0); ctx.fillStyle = pg;
+    ctx.fillRect(0, 150, 30, 345);
+    ctx.fillRect(-8, 140, 46, 14); ctx.fillRect(-8, 488, 46, 12);
+    ctx.strokeStyle = "rgba(90,50,0,.6)"; ctx.lineWidth = 1;
+    for (let y = 170; y < 480; y += 26) { ctx.beginPath(); ctx.moveTo(4, y); ctx.lineTo(26, y); ctx.stroke(); }
+    ctx.restore();
+  });
+  // scalloped arch
+  ctx.save();
+  ctx.lineWidth = 12; ctx.strokeStyle = "#e6b33a"; ctx.shadowColor = "rgba(255,190,60,.6)"; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.moveTo(415, 150);
+  const lobes = 7;
+  for (let i = 0; i < lobes; i++) {
+    const a0 = Math.PI + i * Math.PI / lobes, a1 = Math.PI + (i + 1) * Math.PI / lobes;
+    const x1 = 640 + Math.cos(a1) * 225, y1 = 150 + Math.sin(a1) * 95;
+    const am = (a0 + a1) / 2, cx = 640 + Math.cos(am) * 262, cy = 150 + Math.sin(am) * 125;
+    ctx.quadraticCurveTo(cx, cy, x1, y1);
+  }
+  ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.lineWidth = 3; ctx.strokeStyle = "#7a4a08"; ctx.stroke();
+  // kalash finial
+  ctx.fillStyle = "#ffcf5a"; ctx.beginPath(); ctx.arc(640, 40, 11, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(640, 14); ctx.lineTo(646, 30); ctx.lineTo(634, 30); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawHalo(t) {
+  const k = litCount() / S.diyas.length, pulse = 0.5 + 0.5 * Math.sin(t * 0.002);
+  const R = 230 + 30 * k;
+  const g = ctx.createRadialGradient(LK.x, LK.y - 30, 30, LK.x, LK.y - 30, R);
+  g.addColorStop(0, `rgba(255,230,140,${0.35 + 0.35 * k + 0.1 * pulse})`); g.addColorStop(1, "rgba(255,150,30,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(LK.x, LK.y - 30, R, 0, TAU); ctx.fill();
+  // rays
+  ctx.save(); ctx.translate(LK.x, LK.y - 40); ctx.rotate(t * 0.0002);
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 24; i++) {
+    ctx.rotate(TAU / 24);
+    ctx.fillStyle = `rgba(255,210,100,${0.04 + 0.06 * k})`;
+    ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(0, -(200 + 40 * k)); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawLotusSeat(x, y, s) {
+  ctx.save(); ctx.translate(x, y);
+  const layers = [{ n: 11, len: 34, w: 13, c1: "#f8bbd0", c2: "#d81b60", sp: 0.95 }, { n: 9, len: 28, w: 11, c1: "#fce4ec", c2: "#ec407a", sp: 0.8 }];
+  layers.forEach(L => {
+    for (let i = 0; i < L.n; i++) {
+      const a = -Math.PI / 2 + (i - (L.n - 1) / 2) * (Math.PI * L.sp / (L.n - 1));
+      ctx.save(); ctx.scale(s, s); ctx.rotate(a + Math.PI / 2);
+      const g = ctx.createLinearGradient(0, 0, 0, -L.len); g.addColorStop(0, L.c2); g.addColorStop(1, L.c1);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(L.w, -L.len * 0.55, 0, -L.len); ctx.quadraticCurveTo(-L.w, -L.len * 0.55, 0, 0); ctx.fill();
+      ctx.restore();
+    }
+  });
+  ctx.restore();
+}
+function drawLakshmi(t) {
+  const x = LK.x - LK.w / 2, y = LK.y - LK.h / 2;
+  drawLotusSeat(LK.x, LK.y + LK.h / 2 + 22, 3.2);
+  // frame shadow + plate
+  ctx.save(); ctx.shadowColor = "rgba(255,200,80,.7)"; ctx.shadowBlur = 25;
+  rr(x - 14, y - 14, LK.w + 28, LK.h + 28, 22); ctx.fillStyle = "#8a5a10"; ctx.fill(); ctx.restore();
+  const fg = ctx.createLinearGradient(x, y, x + LK.w, y + LK.h);
+  fg.addColorStop(0, "#fff0b0"); fg.addColorStop(0.3, "#d9a23a"); fg.addColorStop(0.6, "#ffe08a"); fg.addColorStop(1, "#a86f12");
+  rr(x - 12, y - 12, LK.w + 24, LK.h + 24, 20); ctx.fillStyle = fg; ctx.fill();
+  // inner image area
+  ctx.save(); rr(x, y, LK.w, LK.h, 12); ctx.clip();
+  const bg = ctx.createRadialGradient(LK.x, LK.y - 40, 10, LK.x, LK.y, 260); bg.addColorStop(0, "#ffecb3"); bg.addColorStop(0.5, "#e65100"); bg.addColorStop(1, "#5d0a0a");
+  ctx.fillStyle = bg; ctx.fillRect(x, y, LK.w, LK.h);
+  if (lakshmiReady) {
+    const iw = lakshmiImg.naturalWidth, ih = lakshmiImg.naturalHeight;
+    const sc = Math.min(LK.w / iw, LK.h / ih);     // contain: never crops the deity
+    const dw = iw * sc, dh = ih * sc;
+    ctx.drawImage(lakshmiImg, LK.x - dw / 2, LK.y - dh / 2, dw, dh);
+  } else {
+    // respectful placeholder until the devotee uploads an image
+    ctx.fillStyle = "rgba(255,240,200,.25)"; ctx.beginPath(); ctx.arc(LK.x, LK.y - 50, 95, 0, TAU); ctx.fill();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = "#fff2b0"; ctx.shadowBlur = 25; ctx.fillStyle = "#b71c1c";
+    ctx.font = "120px 'Tiro Devanagari Hindi', serif"; ctx.fillText("श्री", LK.x, LK.y - 45);
+    ctx.shadowBlur = 0; ctx.fillStyle = "#4a0a04";
+    ctx.font = "30px 'Tiro Devanagari Hindi', serif"; ctx.fillText("महालक्ष्म्यै नमः", LK.x, LK.y + 70);
+    ctx.fillStyle = "rgba(255,245,220,.9)"; ctx.font = "13px Poppins, sans-serif";
+    ctx.fillText("Upload Lakshmi ji's image", LK.x, LK.y + 118); ctx.fillText("from the sidebar", LK.x, LK.y + 136);
+    drawLotusSeat(LK.x, LK.y + 165, 1.6);
+  }
+  ctx.restore();
+  // frame studs
+  ctx.fillStyle = "#fff6cf";
+  for (let i = 0; i < 14; i++) {
+    const px = x + (i + 0.5) * LK.w / 14;
+    ctx.beginPath(); ctx.arc(px, y - 6, 2.4, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(px, y + LK.h + 6, 2.4, 0, TAU); ctx.fill();
+  }
+  // small garland across the top of the frame
+  for (let i = 0; i <= 16; i++) {
+    const px = x - 10 + i * (LK.w + 20) / 16, py = y - 8 + Math.sin(i / 16 * Math.PI) * 40;
+    ctx.fillStyle = i % 2 ? "#ffb300" : "#e65100"; ctx.beginPath(); ctx.arc(px, py, 7, 0, TAU); ctx.fill();
+  }
+}
+function drawPlatform() {
+  // chowki legs
+  ctx.fillStyle = "#4e2a0c"; ctx.fillRect(415, 560, 20, 40); ctx.fillRect(845, 560, 20, 40);
+  // top + red cloth
+  const tg = ctx.createLinearGradient(0, 495, 0, 525); tg.addColorStop(0, "#c62828"); tg.addColorStop(1, "#8e0000");
+  ctx.fillStyle = tg; ctx.fillRect(395, 495, 490, 28);
+  ctx.fillStyle = "#b71c1c"; ctx.beginPath(); ctx.moveTo(395, 523); ctx.lineTo(885, 523);
+  for (let x = 885; x >= 395; x -= 35) ctx.quadraticCurveTo(x - 17, 580, x - 35, 560);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "#ffd54f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(395, 527); ctx.lineTo(885, 527); ctx.stroke();
+  ctx.fillStyle = "#ffd54f";
+  for (let x = 410; x < 885; x += 35) { ctx.beginPath(); ctx.arc(x + 5, 548, 3, 0, TAU); ctx.fill(); }
+}
+function drawKalash(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  // leaves
+  for (let i = -2; i <= 2; i++) {
+    ctx.save(); ctx.translate(0, -36); ctx.rotate(i * 0.38);
+    ctx.fillStyle = i % 2 ? "#388e3c" : "#2e7d32";
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(10, -22, 0, -46); ctx.quadraticCurveTo(-10, -22, 0, 0); ctx.fill(); ctx.restore();
+  }
+  // coconut
+  ctx.fillStyle = "#6d4c2f"; ctx.beginPath(); ctx.ellipse(0, -46, 15, 18, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#a1887f"; ctx.lineWidth = 1; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 4, -62); ctx.lineTo(i * 6, -34); ctx.stroke(); }
+  // pot
+  const g = ctx.createRadialGradient(-10, -5, 4, 0, 0, 36); g.addColorStop(0, "#ffcc80"); g.addColorStop(0.5, "#d2691e"); g.addColorStop(1, "#7a3510");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 32, 0, TAU); ctx.fill();
+  ctx.fillRect(-14, -36, 28, 12); ctx.beginPath(); ctx.ellipse(0, -36, 19, 5, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#d50000"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, -22, 16, 4, 0, 0, TAU); ctx.stroke();
+  ctx.fillStyle = "#c62828"; ctx.font = "bold 18px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("ॐ", 0, 4);
+  ctx.restore();
+}
+function drawCoins(x, y) {
+  for (let i = 0; i < 6; i++) {
+    const g = ctx.createLinearGradient(x - 22, 0, x + 22, 0); g.addColorStop(0, "#b8860b"); g.addColorStop(0.5, "#fff1a8"); g.addColorStop(1, "#b8860b");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x + (i % 2) * 2, y - i * 6, 22, 7, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#8a6508"; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.fillStyle = "#ffe082"; ctx.beginPath(); ctx.ellipse(x + 34, y - 4, 14, 14, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#8a6508"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("₹", x + 34, y - 4);
+}
+function drawRangoli(t) {
+  ctx.save(); ctx.translate(640, 680); ctx.scale(1, 0.28);
+  const rings = [{ r: 250, n: 28, c: "#e91e63" }, { r: 200, n: 22, c: "#ffc107" }, { r: 150, n: 18, c: "#4caf50" }, { r: 100, n: 14, c: "#03a9f4" }, { r: 55, n: 10, c: "#ff5722" }];
+  rings.forEach((R, k) => {
+    ctx.fillStyle = R.c; ctx.globalAlpha = 0.75;
+    for (let i = 0; i < R.n; i++) {
+      ctx.save(); ctx.rotate(i * TAU / R.n + k * 0.1); ctx.translate(0, -R.r + 18);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(14, -18, 0, -40); ctx.quadraticCurveTo(-14, -18, 0, 0); ctx.fill(); ctx.restore();
+    }
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = "#fff8e1"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, R.r - 30, 0, TAU); ctx.stroke();
+  });
+  ctx.restore(); ctx.globalAlpha = 1;
+  // floor diyas around the rangoli (light up after all thali diyas are lit)
+  [[330, 690], [430, 708], [850, 708], [950, 690]].forEach(([x, y], i) => drawDiya(x, y, S.floorLit > 0, t, 40 + i, 0.8));
+}
+
+// ---------------------------------------------------------------------------
+// Drawing: puja items
+// ---------------------------------------------------------------------------
+function drawFlame(x, y, s, t, seed) {
+  const f = 1 + 0.1 * Math.sin(t * 0.021 + seed) + 0.06 * Math.sin(t * 0.047 + seed * 2.3);
+  const sw = Math.sin(t * 0.013 + seed) * 2.2 * s;
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  const g = ctx.createRadialGradient(x, y - 9 * s, 0, x, y - 9 * s, 46 * s);
+  g.addColorStop(0, "rgba(255,190,70,0.5)"); g.addColorStop(1, "rgba(255,110,0,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y - 9 * s, 46 * s, 0, TAU); ctx.fill(); ctx.restore();
+  const h = 26 * s * f, w = 7.5 * s;
+  ctx.save(); ctx.translate(x, y);
+  const fg = ctx.createLinearGradient(0, 2, 0, -h);
+  fg.addColorStop(0, "#ff5a00"); fg.addColorStop(0.35, "#ffb300"); fg.addColorStop(1, "#fff8d0");
+  ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(0, 2 * s);
+  ctx.bezierCurveTo(w * 1.5, -h * 0.2, w * 0.5 + sw * 0.3, -h * 0.65, sw, -h);
+  ctx.bezierCurveTo(-w * 0.5 + sw * 0.3, -h * 0.65, -w * 1.5, -h * 0.2, 0, 2 * s); ctx.fill();
+  ctx.fillStyle = "rgba(110,160,255,0.75)"; ctx.beginPath(); ctx.ellipse(0, -2.5 * s, 2.4 * s, 4.5 * s, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function drawDiya(x, y, lit, t, seed, s = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const g = ctx.createLinearGradient(0, -6, 0, 13); g.addColorStop(0, "#d7782f"); g.addColorStop(1, "#6b2f10");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(-19, -3); ctx.quadraticCurveTo(-17, 13, 0, 13); ctx.quadraticCurveTo(14, 13, 18, 2);
+  ctx.lineTo(25, -8); ctx.lineTo(12, -4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#8a4b1c"; ctx.beginPath(); ctx.ellipse(-1, -3, 18, 5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = lit ? "#ffd54f" : "#c9a13b"; ctx.beginPath(); ctx.ellipse(-1, -3, 14, 3.3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#fff3e0"; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(i * 6 - 1, 5, 1.4, 0, TAU); ctx.fill(); }
+  ctx.strokeStyle = "#fffde7"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12, -4); ctx.lineTo(16, -7); ctx.stroke();
+  ctx.restore();
+  if (lit) drawFlame(x + 15 * s, y - 7 * s, 0.75 * s, t, seed);
+}
+function drawThali(t) {
+  const th = S.thali, r = th.r;
+  // aarti light trail
+  if (S.trail.length > 1) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+    for (let i = 1; i < S.trail.length; i++) {
+      const p = S.trail[i], q = S.trail[i - 1], a = 1 - p.age / 60;
+      ctx.strokeStyle = `rgba(255,180,60,${0.35 * a})`; ctx.lineWidth = 26 * a;
+      ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(th.x + 6, th.y + 10, r, r * 0.95, 0, 0, TAU); ctx.fill();
+  if (th.glow > 0.02) { ctx.shadowColor = `rgba(255,220,120,${th.glow})`; ctx.shadowBlur = 40 * th.glow; }
+  const g = ctx.createRadialGradient(th.x - r * 0.3, th.y - r * 0.35, r * 0.1, th.x, th.y, r);
+  g.addColorStop(0, "#fff1b8"); g.addColorStop(0.45, "#e9b949"); g.addColorStop(0.85, "#b07d17"); g.addColorStop(1, "#6e4a08");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(th.x, th.y, r, 0, TAU); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#7a5208"; ctx.lineWidth = 3; ctx.stroke();
+  ctx.strokeStyle = "rgba(255,245,200,.6)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(th.x, th.y, r - 9, 0, TAU); ctx.stroke();
+  ctx.fillStyle = "rgba(120,80,10,.6)";
+  for (let i = 0; i < 36; i++) { const a = i * TAU / 36; ctx.beginPath(); ctx.arc(th.x + Math.cos(a) * (r - 4.5), th.y + Math.sin(a) * (r - 4.5), 1.6, 0, TAU); ctx.fill(); }
+  // kumkum, rice & a flower in the middle
+  ctx.fillStyle = "#8a5a10"; ctx.beginPath(); ctx.arc(th.x - 13, th.y, 12, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#d50000"; ctx.beginPath(); ctx.arc(th.x - 13, th.y, 9, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#8a5a10"; ctx.beginPath(); ctx.arc(th.x + 14, th.y, 12, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#fffde7"; for (let i = 0; i < 14; i++) { const a = i * 2.4, rr2 = (i % 4) * 2.2; ctx.beginPath(); ctx.ellipse(th.x + 14 + Math.cos(a) * rr2, th.y + Math.sin(a) * rr2, 1.8, 1, a, 0, TAU); ctx.fill(); }
+  drawFlower(th.x, th.y - 20, "marigold", 0.55, 0);
+  drawFlower(th.x, th.y + 22, "rose", 0.5, 1);
+  ctx.restore();
+  const s = diyaScale();
+  S.diyas.forEach((d, i) => { const p = diyaPos(d); drawDiya(p.x, p.y, d.lit, t, i * 3.1, s); });
+  th.glow *= 0.93;
+}
+function drawCandle(t) {
+  const c = S.candle;
+  ctx.save();
+  // brass holder
+  const hg = ctx.createLinearGradient(c.x - 30, 0, c.x + 30, 0); hg.addColorStop(0, "#8a5a10"); hg.addColorStop(0.5, "#ffe08a"); hg.addColorStop(1, "#8a5a10");
+  ctx.fillStyle = hg; ctx.beginPath(); ctx.ellipse(c.x, c.y, 30, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillRect(c.x - 15, c.y - 14, 30, 14);
+  // wax body
+  const wg = ctx.createLinearGradient(c.x - 12, 0, c.x + 12, 0); wg.addColorStop(0, "#e8d7b0"); wg.addColorStop(0.45, "#fffaf0"); wg.addColorStop(1, "#d6c39a");
+  ctx.fillStyle = wg; ctx.fillRect(c.x - 11, c.y - 92, 22, 80);
+  ctx.fillStyle = "#fff8e1"; ctx.beginPath(); ctx.ellipse(c.x, c.y - 92, 11, 4, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#c62828"; ctx.fillRect(c.x - 11, c.y - 50, 22, 5);
+  ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c.x, c.y - 92); ctx.lineTo(c.x, c.y - 99); ctx.stroke();
+  ctx.restore();
+  drawFlame(c.x, c.y - 98, 1, t, 7.7);
+  if (!c.heldBy && !allLit()) {
+    ctx.fillStyle = "rgba(255,240,200,.85)"; ctx.font = "13px Poppins, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("🕯️ Pinch to pick up", c.x, c.y + 32);
+  }
+}
+function drawFlower(x, y, type, s, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0); ctx.scale(s, s);
+  if (type === "marigold") {
+    [{ r: 15, n: 18, c: "#e65100" }, { r: 11, n: 15, c: "#fb8c00" }, { r: 7, n: 11, c: "#ffb300" }].forEach(L => {
+      ctx.fillStyle = L.c;
+      for (let i = 0; i < L.n; i++) { ctx.save(); ctx.rotate(i * TAU / L.n); ctx.beginPath(); ctx.ellipse(0, -L.r * 0.62, 3.4, L.r * 0.5, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    });
+    ctx.fillStyle = "#bf360c"; ctx.beginPath(); ctx.arc(0, 0, 3, 0, TAU); ctx.fill();
+  } else if (type === "rose") {
+    ctx.fillStyle = "#c62828";
+    for (let i = 0; i < 6; i++) { ctx.save(); ctx.rotate(i * TAU / 6); ctx.beginPath(); ctx.ellipse(0, -8, 8, 9, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    ctx.fillStyle = "#e53935"; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#8e0000"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); for (let a = 0; a < 12; a += 0.3) { const rr3 = a * 0.7; ctx.lineTo(Math.cos(a) * rr3, Math.sin(a) * rr3); } ctx.stroke();
+  } else if (type === "lotus") {
+    [{ n: 8, len: 22, w: 9, c1: "#f8bbd0", c2: "#e91e63" }, { n: 6, len: 15, w: 7, c1: "#fff0f5", c2: "#f06292" }].forEach((L, k) => {
+      for (let i = 0; i < L.n; i++) {
+        ctx.save(); ctx.rotate(i * TAU / L.n + k * 0.3);
+        const g = ctx.createLinearGradient(0, 0, 0, -L.len); g.addColorStop(0, L.c2); g.addColorStop(1, L.c1); ctx.fillStyle = g;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(L.w, -L.len * 0.55, 0, -L.len); ctx.quadraticCurveTo(-L.w, -L.len * 0.55, 0, 0); ctx.fill(); ctx.restore();
+      }
+    });
+    ctx.fillStyle = "#ffd600"; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, TAU); ctx.fill();
+  } else { // jasmine
+    ctx.fillStyle = "#fffdf5";
+    for (let i = 0; i < 5; i++) { ctx.save(); ctx.rotate(i * TAU / 5); ctx.beginPath(); ctx.ellipse(0, -9, 5, 9, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    ctx.fillStyle = "#c5e1a5"; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawBasket() {
+  const b = BASKET;
+  const pile = [[-50, -18, "marigold"], [-22, -30, "rose"], [8, -34, "lotus"], [38, -26, "marigold"], [60, -12, "jasmine"], [-30, -8, "jasmine"], [22, -10, "rose"], [-62, -4, "lotus"], [0, -16, "marigold"]];
+  pile.forEach(([dx, dy, ty], i) => drawFlower(b.x + dx, b.y + dy, ty, 1, i));
+  const g = ctx.createLinearGradient(0, b.y - 10, 0, b.y + 50); g.addColorStop(0, "#a1662f"); g.addColorStop(1, "#5d3a17");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(b.x - 90, b.y - 5); ctx.lineTo(b.x + 90, b.y - 5); ctx.lineTo(b.x + 70, b.y + 50); ctx.lineTo(b.x - 70, b.y + 50); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.clip(); ctx.strokeStyle = "rgba(255,220,160,.35)"; ctx.lineWidth = 2;
+  for (let i = -12; i < 14; i++) { ctx.beginPath(); ctx.moveTo(b.x + i * 14, b.y - 5); ctx.lineTo(b.x + i * 14 + 30, b.y + 50); ctx.stroke(); ctx.beginPath(); ctx.moveTo(b.x + i * 14, b.y - 5); ctx.lineTo(b.x + i * 14 - 30, b.y + 50); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = "#7a4a1d"; ctx.beginPath(); ctx.ellipse(b.x, b.y - 5, 92, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = "rgba(255,240,200,.9)"; ctx.font = "14px 'Tiro Devanagari Hindi', serif"; ctx.textAlign = "center";
+  ctx.fillText("पुष्प • Pinch a flower", b.x, b.y + 72);
+}
+function drawBell(t) {
+  S.bellSwing *= 0.985;
+  const ang = Math.sin(t * 0.012) * 0.35 * S.bellSwing;
+  ctx.save(); ctx.translate(BELL.x, 112); ctx.rotate(ang);
+  ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 3; ctx.setLineDash([5, 3]); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 58); ctx.stroke(); ctx.setLineDash([]);
+  const g = ctx.createLinearGradient(-30, 0, 30, 0); g.addColorStop(0, "#8a5a10"); g.addColorStop(0.5, "#ffe08a"); g.addColorStop(1, "#8a5a10");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-8, 60); ctx.quadraticCurveTo(-12, 72, -26, 108); ctx.lineTo(26, 108); ctx.quadraticCurveTo(12, 72, 8, 60); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 108, 28, 6, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#6d4508"; ctx.beginPath(); ctx.arc(Math.sin(t * 0.02) * 6 * S.bellSwing, 116, 5, 0, TAU); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "rgba(255,240,200,.75)"; ctx.font = "12px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillText("Wave to ring 🔔", BELL.x, 248);
+}
+function drawBhajanBtn(t) {
+  const b = BHAJAN, playing = hasAudio ? !audioEl.paused : !!drone;
+  ctx.save();
+  if (playing) { ctx.shadowColor = "rgba(255,200,80,.9)"; ctx.shadowBlur = 20 + 8 * Math.sin(t * 0.006); }
+  const g = ctx.createRadialGradient(b.x - 10, b.y - 12, 5, b.x, b.y, b.r); g.addColorStop(0, "#fff1b8"); g.addColorStop(1, "#c98a12");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#7a4a08"; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = "#5a1606";
+  if (playing) { ctx.fillRect(b.x - 12, b.y - 15, 8, 30); ctx.fillRect(b.x + 4, b.y - 15, 8, 30); }
+  else { ctx.beginPath(); ctx.moveTo(b.x - 9, b.y - 16); ctx.lineTo(b.x + 15, b.y); ctx.lineTo(b.x - 9, b.y + 16); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  ctx.fillStyle = "rgba(255,240,200,.9)"; ctx.textAlign = "center"; ctx.font = "15px 'Tiro Devanagari Hindi', serif";
+  ctx.fillText(hasAudio ? "भजन • Bhajan" : "Ambient Drone", b.x, b.y + b.r + 20);
+  ctx.font = "11px Poppins, sans-serif"; ctx.fillStyle = "rgba(255,240,200,.6)";
+  ctx.fillText("hover 1s or pinch", b.x, b.y + b.r + 36);
+  // music notes when playing
+  if (playing) {
+    ctx.fillStyle = "rgba(255,215,120,.8)"; ctx.font = "20px serif";
+    for (let i = 0; i < 3; i++) { const ph = ((t * 0.0006 + i / 3) % 1); ctx.globalAlpha = 1 - ph; ctx.fillText(i % 2 ? "♪" : "♫", b.x - 30 + i * 30, b.y - b.r - ph * 50); }
+    ctx.globalAlpha = 1;
+  }
+  // dwell progress rings
+  for (const id in cursors) {
+    const c = cursors[id];
+    if (c.visible && c.dwell.target === "bhajan" && !c.dwell.fired) {
+      const p = clamp((performance.now() - c.dwell.t0) / 1000, 0, 1);
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 7, -Math.PI / 2, -Math.PI / 2 + p * TAU); ctx.stroke();
+    }
+  }
+}
+function drawOffered(t) {
+  S.offered.forEach((f, i) => {
+    const age = (t - f.t) / 400, s = age < 1 ? 0.5 + 0.5 * age + Math.sin(age * Math.PI) * 0.25 : 1;
+    drawFlower(f.x, f.y, f.type, s, f.rot);
+  });
+  S.falling = S.falling.filter(f => {
+    f.vy += 0.3; f.x += f.vx; f.y += f.vy; f.rot += f.vr; f.life++;
+    if (f.y > 700) { f.y = 700; f.vy = 0; f.vx *= 0.8; }
+    ctx.globalAlpha = clamp(1 - (f.life - 60) / 40, 0, 1); drawFlower(f.x, f.y, f.type, 1, f.rot); ctx.globalAlpha = 1;
+    return f.life < 100;
+  });
+}
+function drawParticles() {
+  ctx.save();
+  S.particles = S.particles.filter(p => {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++; p.rot += 0.08;
+    const a = clamp(1 - p.life / p.max, 0, 1);
+    if (p.kind === "spark") {
+      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a; ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, TAU); ctx.fill();
+    } else if (p.kind === "coin") {
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      ctx.fillStyle = "#ffcc33"; ctx.strokeStyle = "#a07000"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.s * Math.abs(Math.cos(p.rot)) + 1, p.s, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = p.kind === "petal" ? a : 1; ctx.fillStyle = p.c;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.beginPath(); ctx.ellipse(0, 0, p.s * 1.6, p.s * 0.8, 0, 0, TAU); ctx.fill(); ctx.restore();
+    }
+    return p.life < p.max && p.y < H + 30;
+  });
+  ctx.restore();
+}
+const HAND_CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+function drawCursors(t) {
+  for (const id in cursors) {
+    const c = cursors[id]; if (!c.visible) continue;
+    if (c.lm && CFG.skeleton && id !== "mouse") {
+      const pts = c.lm.map(mapLm);
+      ctx.save(); ctx.strokeStyle = "rgba(255,230,150,.35)"; ctx.lineWidth = 3;
+      HAND_CONN.forEach(([a, b]) => { ctx.beginPath(); ctx.moveTo(pts[a].x, pts[a].y); ctx.lineTo(pts[b].x, pts[b].y); ctx.stroke(); });
+      ctx.fillStyle = "rgba(255,240,190,.5)"; pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, TAU); ctx.fill(); });
+      ctx.restore();
+    }
+    if (c.hold && c.hold.type === "flower") drawFlower(c.x, c.y, c.hold.f.type, 1.15, c.hold.f.rot);
+    ctx.save();
+    ctx.shadowColor = "rgba(255,210,90,.9)"; ctx.shadowBlur = 16;
+    ctx.strokeStyle = c.pinch ? "#fff6cf" : "rgba(255,215,110,.9)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(c.x, c.y, c.pinch ? 10 : 18, 0, TAU); ctx.stroke();
+    if (c.pinch) { ctx.fillStyle = "rgba(255,220,120,.85)"; ctx.fill(); }
+    ctx.restore();
+  }
+}
+function drawPip() {
+  if (!CFG.showCam || video.readyState < 2) return;
+  const p = PIP;
+  ctx.save(); rr(p.x, p.y, p.w, p.h, 12); ctx.clip();
+  ctx.save(); if (CFG.mirror) { ctx.translate(p.x + p.w, p.y); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, p.w, p.h); } else ctx.drawImage(video, p.x, p.y, p.w, p.h); ctx.restore();
+  for (const id in cursors) {
+    const c = cursors[id]; if (!c.visible || !c.lm) continue;
+    ctx.fillStyle = c.pinch ? "#ffeb3b" : "#69f0ae";
+    c.lm.forEach(l => { const x = p.x + (CFG.mirror ? 1 - l.x : l.x) * p.w, y = p.y + l.y * p.h; ctx.beginPath(); ctx.arc(x, y, 2, 0, TAU); ctx.fill(); });
+  }
+  ctx.restore();
+  ctx.strokeStyle = "#e6b33a"; ctx.lineWidth = 3; rr(p.x, p.y, p.w, p.h, 12); ctx.stroke();
+  ctx.fillStyle = "rgba(0,0,0,.55)"; rr(p.x + 8, p.y + p.h - 24, 92, 18, 9); ctx.fill();
+  ctx.fillStyle = "#ffe9b0"; ctx.font = "11px Poppins, sans-serif"; ctx.textAlign = "left"; ctx.fillText("● Bhakt (You)", p.x + 14, p.y + p.h - 11);
+}
+function drawHUD(t) {
+  // checklist
+  const x = 14, y = 128, w = 252, need = CFG.flowersNeeded, rounds = CFG.aartiRounds;
+  const items = [
+    ["Touch the thali", S.steps.touch, ""],
+    ["Light the diyas", allLit(), `${litCount()}/${S.diyas.length}`],
+    ["Offer flowers", S.steps.flowers >= need, `${Math.min(S.steps.flowers, need)}/${need}`],
+    ["Perform aarti", S.steps.aarti >= rounds, `${Math.min(S.steps.aarti, rounds)}/${rounds}`],
+    ["Play bhajan (optional)", S.steps.bhajan, ""]
+  ];
+  ctx.save(); ctx.fillStyle = "rgba(30,5,3,.72)"; rr(x, y, w, 40 + items.length * 26, 14); ctx.fill();
+  ctx.strokeStyle = "rgba(230,179,58,.8)"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = "#ffd36b"; ctx.font = "17px 'Tiro Devanagari Hindi', serif"; ctx.textAlign = "left";
+  ctx.fillText("पूजा विधि • Puja Steps", x + 14, y + 26);
+  items.forEach(([label, ok, prog], i) => {
+    const yy = y + 52 + i * 26;
+    ctx.fillStyle = ok ? "#69f0ae" : "rgba(255,233,176,.5)"; ctx.font = "15px Poppins, sans-serif";
+    ctx.fillText(ok ? "✔" : "○", x + 14, yy);
+    ctx.fillStyle = ok ? "#e8ffe8" : "#ffe9b0"; ctx.font = "13px Poppins, sans-serif"; ctx.fillText(label, x + 36, yy);
+    if (prog) { ctx.textAlign = "right"; ctx.fillStyle = "#ffd36b"; ctx.fillText(prog, x + w - 14, yy); ctx.textAlign = "left"; }
+  });
+  ctx.restore();
+  // aarti progress ring around Lakshmi ji while the thali is held
+  if (S.thali.heldBy && litCount() > 0 && S.steps.aarti < rounds) {
+    const frac = (Math.abs(S.aarti.total) / TAU) % 1;
+    ctx.save(); ctx.strokeStyle = "rgba(255,230,140,.85)"; ctx.lineWidth = 5; ctx.setLineDash([2, 8]);
+    ctx.beginPath(); ctx.arc(LK.x, LK.y, 215, -Math.PI / 2, -Math.PI / 2 + frac * TAU); ctx.stroke(); ctx.restore();
+  }
+  // next-step hint
+  let hint;
+  if (S.done) hint = "🪔 पूजा सम्पन्न — Puja complete. Shubh Deepavali!";
+  else if (!S.steps.touch) hint = "✋ Raise your hand and touch the thali";
+  else if (!allLit()) hint = "🕯️ Pinch the candle and bring its flame to each diya on the thali";
+  else if (S.steps.flowers < need) hint = "🌼 Pinch a flower from the basket, carry it to Lakshmi ji, and open your fingers";
+  else if (S.steps.aarti < rounds) hint = "🔄 Pinch and hold the thali, then circle it around Lakshmi ji (aarti)";
+  else hint = "🙏 Jai Lakshmi Mata!";
+  ctx.save(); ctx.font = "15px Poppins, sans-serif"; const tw = ctx.measureText(hint).width + 40;
+  ctx.fillStyle = "rgba(30,5,3,.78)"; rr(W / 2 - tw / 2, H - 34, tw, 28, 14); ctx.fill();
+  ctx.strokeStyle = "rgba(230,179,58,.8)"; ctx.stroke();
+  ctx.fillStyle = "#ffe9b0"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(hint, W / 2, H - 20);
+  ctx.restore();
+  // toast
+  if (S.toast) {
+    const age = t - S.toast.t0;
+    if (age > S.toast.dur) S.toast = null;
+    else {
+      const a = clamp(Math.min(age / 200, (S.toast.dur - age) / 400), 0, 1);
+      ctx.save(); ctx.globalAlpha = a; ctx.font = "600 16px Poppins, sans-serif";
+      const tw2 = ctx.measureText(S.toast.text).width + 44;
+      ctx.fillStyle = "rgba(90,20,8,.92)"; rr(W / 2 - tw2 / 2, 122, tw2, 34, 17); ctx.fill();
+      ctx.strokeStyle = "#ffd36b"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = "#fff3cf"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(S.toast.text, W / 2, 139);
+      ctx.restore();
+    }
+  }
+}
+function drawCelebration(t) {
+  if (!S.done) return;
+  const age = t - S.doneT;
+  if (age < 12000) {
+    if (Math.random() < 0.06) burst(rand(150, W - 150), rand(150, 380), 70, "fire", 4.2);
+    if (Math.random() < 0.25) rain(Math.random() < 0.5 ? "coin" : "petal2", 2);
+  }
+  const a = clamp(age < 9000 ? age / 800 : 1 - (age - 9000) / 2000, 0, 1);
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(40,6,3,.55)"; rr(W / 2 - 330, 220, 660, 170, 30); ctx.fill();
+  ctx.shadowColor = "#ffb300"; ctx.shadowBlur = 30; ctx.fillStyle = "#ffe082";
+  ctx.font = "64px 'Tiro Devanagari Hindi', serif"; ctx.fillText("शुभ दीपावली", W / 2, 278);
+  ctx.shadowBlur = 0; ctx.fillStyle = "#fff3cf"; ctx.font = "600 22px Cinzel, serif";
+  ctx.fillText("Lakshmi Pujan Sampann 🙏", W / 2, 336);
+  if (CFG.name) { ctx.font = "16px Poppins, sans-serif"; ctx.fillText("With blessings to " + CFG.name, W / 2, 366); }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Game logic per frame
+// ---------------------------------------------------------------------------
+function updateLogic(t) {
+  // candle / thali glide home when released
+  const cd = S.candle, th = S.thali;
+  if (!cd.heldBy) { cd.x = lerp(cd.x, CANDLE_HOME.x, 0.1); cd.y = lerp(cd.y, CANDLE_HOME.y, 0.1); }
+  if (!th.heldBy) { th.x = lerp(th.x, THALI_HOME.x, 0.08); th.y = lerp(th.y, THALI_HOME.y, 0.08); }
+  // candle lights diyas
+  const fp = flamePos();
+  S.diyas.forEach(d => {
+    if (!d.lit && dist(fp, wickPos(d)) < 30) {
+      d.lit = true; d.litT = t; const w = wickPos(d); burst(w.x, w.y, 28, "gold", 2.8); bell(1318, 1.4, 0.13);
+      toast(allLit() ? "🪔 All diyas are lit! Now offer flowers to Lakshmi ji" : `🪔 Diya lit (${litCount()}/${S.diyas.length})`);
+      if (allLit()) { S.floorLit = 1; bell(988, 2.6, 0.2); }
+    }
+  });
+  // aarti — accumulate the angle the thali sweeps around Lakshmi ji
+  if (th.heldBy && litCount() > 0) {
+    const dx = th.x - LK.x, dy = th.y - LK.y, rad = Math.hypot(dx, dy);
+    if (rad > 70) {
+      const a = Math.atan2(dy, dx);
+      if (S.aarti.last !== null) {
+        let d = a - S.aarti.last; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
+        S.aarti.total += d;
+      }
+      S.aarti.last = a;
+    } else S.aarti.last = null;
+    const rounds = Math.floor(Math.abs(S.aarti.total) / TAU);
+    if (rounds > S.steps.aarti) {
+      S.steps.aarti = rounds; bell(880, 2.8, 0.22); burst(th.x, th.y, 40, "gold", 3.5);
+      toast(rounds >= CFG.aartiRounds ? "🔔 Aarti complete! Om Jai Lakshmi Mata" : `🔄 Aarti round ${rounds}/${CFG.aartiRounds}`);
+    }
+    S.trail.push({ x: th.x, y: th.y, age: 0 });
+  }
+  S.trail.forEach(p => p.age++); S.trail = S.trail.filter(p => p.age < 60);
+  // completion
+  if (!S.done && S.steps.touch && allLit() && S.steps.flowers >= CFG.flowersNeeded && S.steps.aarti >= CFG.aartiRounds) {
+    S.done = true; S.doneT = t; toast("✨ Shubh Deepavali! May Maa Lakshmi bless you ✨", 6000);
+    [0, 450, 900, 1500].forEach((d, i) => setTimeout(() => bell([660, 880, 990, 1320][i], 3, 0.22), d));
+    rain("coin", 40); rain("petal2", 40);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------------
+function frame() {
+  const t = performance.now();
+  if (landmarker && video.readyState >= 2 && video.currentTime !== lastVT) {
+    lastVT = video.currentTime;
+    try { lastResult = landmarker.detectForVideo(video, t); } catch (e) { console.warn(e); }
+    updateHands(lastResult, t);
+  } else if (landmarker) updateHands(null, t);
+  for (const id in cursors) if (cursors[id].visible) processCursor(cursors[id], t);
+  updateLogic(t);
+
+  drawBackground(t); drawCamBackground(); drawHalo(t); drawMandap(); drawToran(); drawFairyLights(t);
+  drawRangoli(t); drawLakshmi(t); drawPlatform(); drawKalash(490, 466); drawCoins(790, 488);
+  drawBell(t); drawBhajanBtn(t); drawBasket(); drawOffered(t); drawThali(t); drawCandle(t);
+  drawParticles(); drawCelebration(t); drawPip(); drawHUD(t); drawCursors(t);
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------------------
+// UI wiring
+// ---------------------------------------------------------------------------
+const btnPlay = document.getElementById("btnPlay"), seek = document.getElementById("seek"), tlabel = document.getElementById("tlabel");
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
+function updatePlayBtn() {
+  const playing = hasAudio ? !audioEl.paused : !!drone;
+  btnPlay.textContent = playing ? "⏸ Pause" : (hasAudio ? "▶ Play Bhajan" : "▶ Ambient Drone");
+}
+btnPlay.onclick = toggleBhajan;
+document.getElementById("btnStop").onclick = () => { if (hasAudio) { audioEl.pause(); audioEl.currentTime = 0; } else if (drone) toggleDrone(); updatePlayBtn(); };
+document.getElementById("vol").oninput = e => { audioEl.volume = e.target.value / 100; };
+audioEl.volume = 0.8;
+seek.oninput = () => { if (hasAudio && isFinite(audioEl.duration)) audioEl.currentTime = seek.value / 1000 * audioEl.duration; };
+audioEl.addEventListener("play", () => { S.steps.bhajan = true; updatePlayBtn(); toast("🎶 " + (CFG.audioName || "Bhajan") + " playing"); });
+audioEl.addEventListener("pause", updatePlayBtn);
+audioEl.addEventListener("timeupdate", () => {
+  tlabel.textContent = `${fmt(audioEl.currentTime)} / ${fmt(audioEl.duration)}`;
+  if (isFinite(audioEl.duration) && audioEl.duration > 0) seek.value = audioEl.currentTime / audioEl.duration * 1000;
+});
+if (!hasAudio) { seek.disabled = true; tlabel.textContent = "No bhajan uploaded"; }
+updatePlayBtn();
+document.getElementById("btnBell").onclick = () => { ensureAC(); ringBell(performance.now(), true); };
+document.getElementById("btnReset").onclick = () => { Object.values(cursors).forEach(c => { c.hold = null; }); resetPuja(); toast("↺ Puja reset — begin again 🙏"); };
+document.getElementById("btnFull").onclick = () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) { (el.requestFullscreen ? el.requestFullscreen() : Promise.reject()).catch(() => toast("Fullscreen not allowed here — use the browser's F11 instead")); }
+  else document.exitFullscreen();
+};
+const overlay = document.getElementById("overlay");
+document.getElementById("btnCam").onclick = () => { ensureAC(); overlay.style.display = "none"; bell(880, 2.5, 0.2); initCamera(); };
+document.getElementById("btnMouse").onclick = () => { ensureAC(); overlay.style.display = "none"; bell(880, 2.5, 0.2); setCam("🖱️ Mouse / touch mode"); toast("🖱️ Press and hold to pick up, release to let go"); };
+
+function fit() {
+  const box = document.getElementById("stageBox").getBoundingClientRect();
+  const s = Math.max(0.1, Math.min((box.width - 8) / W, (box.height - 8) / H));
+  cv.style.width = (W * s) + "px"; cv.style.height = (H * s) + "px";
+}
+window.addEventListener("resize", fit); fit();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
