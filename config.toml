@@ -1,0 +1,15 @@
+[server]
+# Allow bhajan audio files up to ~100 MB to be uploaded and embedded in the stage
+maxUploadSize = 100
+maxMessageSize = 300
+headless = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#FFB300"
+backgroundColor = "#1A0404"
+secondaryBackgroundColor = "#3B0A0A"
+textColor = "#FFE9B0"
