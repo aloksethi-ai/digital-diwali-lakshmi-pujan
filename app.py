@@ -211,7 +211,7 @@ with c1:
 4. **Offer flowers.** Pinch inside the flower basket, carry the flower to Lakshmi ji and open your fingers to place it. Offer **{flowers_needed}** flowers.
 5. **Lotus garland (कमल माला).** Pinch the garland hanging on the right and drop it on Lakshmi ji; it drapes across the centre of her image.
 6. **Bhog.** Pinch a motichoor ladoo or kaju katli from the silver mithai thali and offer **{sweets_needed}** sweets to Lakshmi ji; they go onto the bhog plate.
-7. **Dhan blessings.** Click / pinch the Dhan thali (gold & silver coins, ₹ and $ bundles) on the left. Every tap grows the coin stacks and note bundles and showers wealth on Maa Lakshmi.
+7. **Offer to Dhan Lakshmi.** Click / pinch the Dhan thali (gold & silver coins, ₹ and $ bundles) on the left. Every tap grows the coin stacks and note bundles and showers wealth on Maa Lakshmi.
 8. **Aarti.** Pinch and hold the thali, then move your hand in **{aarti_rounds}** full circles around Lakshmi ji.
 9. **Bhajan.** Hover over the golden ▶ button for one second (or pinch it), or use the top bar.
 10. Wave your hand through the 🔔 **ghanti** to ring it at any time.

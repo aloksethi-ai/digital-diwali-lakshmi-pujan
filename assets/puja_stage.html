@@ -59,7 +59,7 @@
       <div class="credit">Conceptualized and Developed by <b>CA Alok Sethi</b> using Claude</div>
       <p>Raise your hand in front of the camera. <b>Pinch</b> (touch thumb and index finger together) to pick up
         the candle, the thali or a flower, and <b>open your fingers</b> to let go.<br>
-        Light the diyas, offer flowers, the lotus garland and bhog to Lakshmi ji, tap the Dhan thali for blessings,
+        Light the diyas, offer flowers, the lotus garland and bhog to Lakshmi ji, make an offering to Dhan Lakshmi,
         and circle the thali for the aarti.</p>
       <div class="btns">
         <button id="btnCam">📷 Begin Puja with Camera</button>
@@ -744,7 +744,7 @@ function drawWealthThali(t) {
   }
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "rgba(255,240,200,.92)"; ctx.font = "15px 'Tiro Devanagari Hindi', serif";
-  ctx.fillText("धन • Tap for Dhan blessings", w.x, w.y + w.r + 24);
+  ctx.fillText("धन • Offer to Dhan Lakshmi", w.x, w.y + w.r + 24);
   if (L > 0) { ctx.fillStyle = "#ffd36b"; ctx.font = "600 12px Poppins, sans-serif"; ctx.fillText(`Abundance ×${S.steps.dhan}`, w.x, w.y + w.r + 41); }
 }
 function drawLadoo(x, y, s) {
@@ -1082,7 +1082,7 @@ function drawHUD(t) {
     ["Offer lotus garland", S.steps.garland, ""],
     ["Offer bhog (sweets)", S.steps.bhog >= CFG.sweetsNeeded, `${Math.min(S.steps.bhog, CFG.sweetsNeeded)}/${CFG.sweetsNeeded}`],
     ["Perform aarti", S.steps.aarti >= rounds, `${Math.min(S.steps.aarti, rounds)}/${rounds}`],
-    ["Dhan blessings (optional)", S.steps.dhan > 0, S.steps.dhan ? "×" + S.steps.dhan : ""],
+    ["Offer to Dhan Lakshmi", S.steps.dhan > 0, S.steps.dhan ? "×" + S.steps.dhan : ""],
     ["Play bhajan (optional)", S.steps.bhajan, ""]
   ];
   ctx.save(); ctx.fillStyle = "rgba(30,5,3,.72)"; rr(x, y, w, 36 + items.length * 24, 14); ctx.fill();
