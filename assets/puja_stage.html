@@ -59,7 +59,8 @@
       <div class="credit">Conceptualized and Developed by <b>CA Alok Sethi</b> using Claude</div>
       <p>Raise your hand in front of the camera. <b>Pinch</b> (touch thumb and index finger together) to pick up
         the candle, the thali or a flower, and <b>open your fingers</b> to let go.<br>
-        Light the diyas, offer flowers to Lakshmi ji, and circle the thali for the aarti.</p>
+        Light the diyas, offer flowers, the lotus garland and bhog to Lakshmi ji, tap the Dhan thali for blessings,
+        and circle the thali for the aarti.</p>
       <div class="btns">
         <button id="btnCam">📷 Begin Puja with Camera</button>
         <button id="btnMouse" class="alt">🖱️ Use Mouse / Touch only</button>
@@ -81,7 +82,7 @@
 // Config (injected by app.py). Defaults keep the page usable standalone.
 // ---------------------------------------------------------------------------
 const CFG = Object.assign({
-  lakshmi: null, audio: null, audioName: "", name: "", diyas: 5, flowersNeeded: 5,
+  lakshmi: null, audio: null, audioName: "", name: "", diyas: 5, flowersNeeded: 5, sweetsNeeded: 3,
   aartiRounds: 3, pinch: 0.35, showCam: true, camBg: false, skeleton: true, sfx: true,
   loop: true, mirror: true, smooth: 0.45
 }, (typeof CONFIG !== "undefined") ? CONFIG : {});
@@ -102,9 +103,13 @@ if (hasAudio) { audioEl.src = CFG.audio; audioEl.loop = !!CFG.loop; }
 // Scene layout (logical 1280x720 coordinates)
 const LK = { x: 640, y: 305, w: 290, h: 340 };            // Lakshmi ji frame
 const THALI_HOME = { x: 640, y: 600 };
-const CANDLE_HOME = { x: 205, y: 610 };
+const CANDLE_HOME = { x: 330, y: 610 };
+const WEALTH = { x: 165, y: 482, r: 78 };                // Dhan thali (coins & notes)
+const SWEETS = { x: 1100, y: 472, r: 72 };               // Mithai thali (bhog)
+const GARLAND_PEG = { x: 985, y: 168 };                  // lotus garland hangs here
+const BHOG = { x: 790, y: 492 };                         // bhog plate on the chowki
 const BASKET = { x: 1095, y: 625 };
-const BHAJAN = { x: 1095, y: 430, r: 46 };
+const BHAJAN = { x: 1185, y: 262, r: 40 };
 const BELL = { x: 345, y: 205 };
 const PIP = { x: 1062, y: 16, w: 200, h: 150 };
 
@@ -186,7 +191,8 @@ function resetPuja() {
     diyas: Array.from({ length: diyaCount }, (_, i) => ({ ang: -Math.PI / 2 + i * TAU / diyaCount, lit: false, litT: 0 })),
     offered: [], falling: [], particles: [], trail: [],
     aarti: { total: 0, last: null },
-    steps: { touch: false, flowers: 0, aarti: 0, bhajan: false },
+    steps: { touch: false, flowers: 0, aarti: 0, bhajan: false, garland: false, bhog: 0, dhan: 0 },
+    wealth: 0, wealthFx: 0, garland: { on: false, t: 0 }, bhogItems: [],
     done: false, doneT: 0, toast: null, bellSwing: 0, bellLast: 0, floorLit: 0
   };
 }
@@ -259,12 +265,19 @@ function tryGrab(c0, now) {
   if (!cd.heldBy && Math.abs(c.x - cd.x) < 36 && c.y > cd.y - 130 && c.y < cd.y + 18) {
     cd.heldBy = c.id; grab({ type: "candle" }, cd); return;
   }
+  if (!S.garland.on && !(c0.hold) && Math.abs(c.x - GARLAND_PEG.x) < 60 && c.y > GARLAND_PEG.y && c.y < GARLAND_PEG.y + 175 && !garlandHeld()) {
+    grab({ type: "garland" }, null); return;
+  }
   const th = S.thali;
   if (!th.heldBy && dist(c, th) < th.r + 8) {
     th.heldBy = c.id; grab({ type: "thali" }, th);
     if (litCount() > 0) toast("🪔 Now circle the thali around Lakshmi ji for the aarti");
     return;
   }
+  if (dist(c, SWEETS) < SWEETS.r + 6) {
+    grab({ type: "sweet", s: c.x < SWEETS.x ? "ladoo" : "katli", rot: rand(-0.4, 0.4) }, null); return;
+  }
+  if (dist(c, WEALTH) < WEALTH.r + 10) { addWealth(now); return; }
   if (Math.abs(c.x - BASKET.x) < 95 && Math.abs(c.y - BASKET.y) < 70) {
     grab({ type: "flower", f: { type: FLOWER_TYPES[Math.floor(Math.random() * FLOWER_TYPES.length)], rot: rand(0, TAU) } }, null);
   }
@@ -273,6 +286,22 @@ function release(c, now) {
   const h = c.hold; if (!h) return;
   if (h.type === "candle") S.candle.heldBy = null;
   else if (h.type === "thali") { S.thali.heldBy = null; S.aarti.last = null; }
+  else if (h.type === "garland") {
+    if (inLakshmi(c, 45)) {
+      S.garland.on = true; S.garland.t = now; S.steps.garland = true;
+      burst(LK.x, LK.y, 40, "petal", 3); bell(1175, 2.2, 0.2);
+      toast("🪷 Lotus garland offered to Maa Lakshmi");
+    } else toast("🪷 Bring the garland onto Lakshmi ji's image and open your fingers");
+  }
+  else if (h.type === "sweet") {
+    if (inLakshmi(c, 50) || dist(c, BHOG) < 70) {
+      S.bhogItems.push({ type: h.s, t: now, fx: c.x, fy: c.y, rot: h.rot });
+      S.steps.bhog++; bell(1397, 1.3, 0.13); burst(BHOG.x, BHOG.y - 10, 16, "gold", 2);
+      const need = CFG.sweetsNeeded;
+      toast(S.steps.bhog >= need ? "🍬 Bhog offered — Maa Lakshmi accepts your naivedya!" :
+        `${h.s === "ladoo" ? "🟠 Motichoor ladoo" : "🔷 Kaju katli"} offered (${S.steps.bhog}/${need})`);
+    } else S.falling.push({ x: c.x, y: c.y, vx: rand(-1, 1), vy: 0, sweet: h.s, rot: h.rot, vr: rand(-0.1, 0.1), life: 0 });
+  }
   else if (h.type === "flower") {
     if (inLakshmi(c, 30)) {
       S.offered.push({ x: clamp(c.x, LK.x - LK.w / 2 - 20, LK.x + LK.w / 2 + 20), y: clamp(c.y, LK.y - LK.h / 2 - 20, LK.y + LK.h / 2 + 30),
@@ -287,6 +316,27 @@ function release(c, now) {
     }
   }
   c.hold = null;
+}
+function garlandHeld() { return Object.values(cursors).some(c => c.hold && c.hold.type === "garland"); }
+const DHAN_MSGS = ["💰 Dhan Lakshmi showers her blessings!", "🪙 Gold and silver multiply!", "💵 Abundance flows into your home!",
+  "₹ May your wealth keep growing!", "✨ Shubh Labh — auspicious gains!", "🙏 Sukh, Samriddhi aur Samridhi!"];
+function addWealth(now) {
+  S.wealth = Math.min(S.wealth + 1, 15); S.steps.dhan++; S.wealthFx = 1;
+  // coins & notes fly from the Dhan thali towards Maa Lakshmi …
+  for (let i = 0; i < 16; i++) {
+    const note = i % 4 === 0;
+    S.particles.push({ x: WEALTH.x + rand(-30, 30), y: WEALTH.y - 20, vx: (LK.x - WEALTH.x) / 55 + rand(-2, 2), vy: rand(-11, -7),
+      life: 0, max: 140, kind: note ? "note" : "coin", c: note ? (i % 8 === 0 ? "#85bb65" : "#b7ad9a") : (i % 3 ? "#ffcc33" : "#d9dde3"),
+      s: note ? 7 : rand(6, 8), rot: rand(0, TAU), g: 0.28 });
+  }
+  // … and a Dhan Varsha (shower of wealth) over her image
+  for (let i = 0; i < 14; i++) {
+    const note = i % 3 === 0;
+    S.particles.push({ x: rand(LK.x - 150, LK.x + 150), y: rand(-60, 0), vx: rand(-0.5, 0.5), vy: rand(2, 3.5), life: 0, max: 400,
+      kind: note ? "note" : "coin", c: note ? (i % 2 ? "#85bb65" : "#b7ad9a") : (i % 4 ? "#ffcc33" : "#d9dde3"), s: note ? 7 : rand(6, 9), rot: rand(0, TAU), g: 0.02 });
+  }
+  bell(2093, 0.9, 0.12); setTimeout(() => bell(2637, 0.8, 0.1), 90);
+  toast(S.wealth >= 15 ? `✨ Akshaya Dhan — endless abundance! (×${S.steps.dhan})` : `${DHAN_MSGS[(S.steps.dhan - 1) % DHAN_MSGS.length]} (×${S.steps.dhan})`);
 }
 function ringBell(now, force) {
   if (!force && now - S.bellLast < 700) return;
@@ -623,6 +673,156 @@ function drawRangoli(t) {
   [[330, 690], [430, 708], [850, 708], [950, 690]].forEach(([x, y], i) => drawDiya(x, y, S.floorLit > 0, t, 40 + i, 0.8));
 }
 
+
+// ---------------------------------------------------------------------------
+// Drawing: Dhan thali, Mithai thali, bhog plate, lotus garland
+// ---------------------------------------------------------------------------
+function drawPlate(x, y, r, silver, glow) {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(x + 5, y + 8, r, r * 0.95, 0, 0, TAU); ctx.fill();
+  if (glow > 0.02) { ctx.shadowColor = `rgba(255,215,100,${glow})`; ctx.shadowBlur = 45 * glow; }
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.1, x, y, r);
+  if (silver) { g.addColorStop(0, "#ffffff"); g.addColorStop(0.5, "#cfd6dd"); g.addColorStop(0.9, "#8d99a6"); g.addColorStop(1, "#5d6873"); }
+  else { g.addColorStop(0, "#fff1b8"); g.addColorStop(0.45, "#e9b949"); g.addColorStop(0.85, "#b07d17"); g.addColorStop(1, "#6e4a08"); }
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.strokeStyle = silver ? "#5d6873" : "#7a5208"; ctx.lineWidth = 3; ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r - 8, 0, TAU); ctx.stroke();
+  ctx.fillStyle = silver ? "rgba(70,80,90,.5)" : "rgba(120,80,10,.6)";
+  for (let i = 0; i < 32; i++) { const a = i * TAU / 32; ctx.beginPath(); ctx.arc(x + Math.cos(a) * (r - 4), y + Math.sin(a) * (r - 4), 1.5, 0, TAU); ctx.fill(); }
+  ctx.restore();
+}
+function drawCoinStack(x, y, n, gold) {
+  for (let i = 0; i < n; i++) {
+    const cy = y - i * 3.3;
+    const g = ctx.createLinearGradient(x - 11, 0, x + 11, 0);
+    if (gold) { g.addColorStop(0, "#a8740a"); g.addColorStop(0.5, "#fff0a0"); g.addColorStop(1, "#a8740a"); }
+    else { g.addColorStop(0, "#7d8790"); g.addColorStop(0.5, "#ffffff"); g.addColorStop(1, "#7d8790"); }
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, cy, 11, 4.2, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = gold ? "#7a5208" : "#5d6873"; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+  const ty = y - (n - 1) * 3.3;
+  ctx.fillStyle = gold ? "#ffe57a" : "#eef2f5"; ctx.beginPath(); ctx.ellipse(x, ty, 8, 2.8, 0, 0, TAU); ctx.fill();
+}
+function drawBundle(x, y, layers, kind) {
+  const base = kind === "usd" ? "#7fae5f" : "#b9ae98", dark = kind === "usd" ? "#4d7a37" : "#857a63";
+  for (let i = 0; i < layers; i++) {
+    const by = y - i * 8;
+    ctx.fillStyle = dark; ctx.fillRect(x - 21, by - 2, 42, 7);                       // side
+    ctx.fillStyle = base; ctx.beginPath();                                             // top face
+    ctx.moveTo(x - 21, by - 2); ctx.lineTo(x - 15, by - 10); ctx.lineTo(x + 27, by - 10); ctx.lineTo(x + 21, by - 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f5f0e1"; ctx.fillRect(x - 2, by - 10, 7, 15);                    // paper band
+    ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 0.6; ctx.strokeRect(x - 21, by - 2, 42, 7);
+  }
+  const ty = y - (layers - 1) * 8;
+  ctx.fillStyle = kind === "usd" ? "#1b4d16" : "#5a3d12"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(kind === "usd" ? "$" : "₹", x - 11, ty - 6); ctx.fillText(kind === "usd" ? "$" : "₹", x + 15, ty - 6);
+}
+function drawWealthThali(t) {
+  const w = WEALTH, L = S.wealth;
+  S.wealthFx *= 0.95;
+  const glow = Math.max(S.wealthFx, Math.min(0.6, L / 20) * (0.7 + 0.3 * Math.sin(t * 0.004)));
+  drawPlate(w.x, w.y, w.r, false, glow);
+  const items = [];
+  const gold = [[-44, -10], [-28, 26], [-56, 22], [-18, -38]], silver = [[46, -10], [30, 26], [56, 22], [20, -38]];
+  const nStacks = Math.min(4, 1 + Math.floor(L / 3)), h = 3 + Math.min(L, 12);
+  for (let i = 0; i < nStacks; i++) {
+    const hh = Math.max(2, h - i * 2);
+    items.push({ y: w.y + gold[i][1], d: () => drawCoinStack(w.x + gold[i][0], w.y + gold[i][1], hh, true) });
+    items.push({ y: w.y + silver[i][1], d: () => drawCoinStack(w.x + silver[i][0], w.y + silver[i][1], Math.max(2, hh - 1), false) });
+  }
+  const layers = Math.min(8, 1 + Math.floor(L / 2));
+  items.push({ y: w.y - 4, d: () => drawBundle(w.x - 4, w.y - 4, layers, "inr") });
+  items.push({ y: w.y + 30, d: () => drawBundle(w.x + 2, w.y + 30, Math.max(1, layers - 1), "usd") });
+  if (L >= 8) items.push({ y: w.y - 40, d: () => drawBundle(w.x - 2, w.y - 40, Math.min(5, L - 7), "usd") });
+  items.sort((a, b) => a.y - b.y).forEach(it => it.d());
+  // overflow: loose coins spilling over the rim as abundance grows
+  for (let i = 0; i < L * 3; i++) {
+    const a = i * 2.39996, rr4 = w.r - 6 + (i % 4) * 5;
+    const x = w.x + Math.cos(a) * rr4, y = w.y + Math.sin(a) * rr4 * 0.9 + 4;
+    ctx.fillStyle = i % 3 ? "#ffcf40" : "#dfe4ea"; ctx.strokeStyle = "rgba(90,60,0,.6)"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.ellipse(x, y, 7, 3, a, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(255,240,200,.92)"; ctx.font = "15px 'Tiro Devanagari Hindi', serif";
+  ctx.fillText("धन • Tap for Dhan blessings", w.x, w.y + w.r + 24);
+  if (L > 0) { ctx.fillStyle = "#ffd36b"; ctx.font = "600 12px Poppins, sans-serif"; ctx.fillText(`Abundance ×${S.steps.dhan}`, w.x, w.y + w.r + 41); }
+}
+function drawLadoo(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const g = ctx.createRadialGradient(-4, -5, 1, 0, 0, 12); g.addColorStop(0, "#ffd180"); g.addColorStop(0.6, "#ff9800"); g.addColorStop(1, "#c25e00");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 11, 0, TAU); ctx.fill();
+  ctx.fillStyle = "rgba(255,240,200,.75)";                      // motichoor pearls
+  for (let i = 0; i < 16; i++) { const a = i * 2.4, r = 2 + (i * 7 % 8); ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 1.1, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = "#7cb342"; ctx.beginPath(); ctx.ellipse(1, -9, 2.5, 1.3, 0.4, 0, TAU); ctx.fill();   // pista
+  ctx.restore();
+}
+function drawKatli(x, y, s, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0); ctx.scale(s, s * 0.62);
+  ctx.fillStyle = "#cdb48a"; ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(16, 2); ctx.lineTo(0, 16); ctx.lineTo(-16, 2); ctx.closePath(); ctx.fill();   // edge
+  const g = ctx.createLinearGradient(-14, -14, 14, 14); g.addColorStop(0, "#ffffff"); g.addColorStop(0.4, "#efe2c8"); g.addColorStop(0.7, "#f8f8f8"); g.addColorStop(1, "#d9c7a3");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(16, 0); ctx.lineTo(0, 16 - 4); ctx.lineTo(-16, 0); ctx.closePath(); ctx.fill();          // top with chandi vark
+  ctx.strokeStyle = "rgba(160,140,100,.6)"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.restore();
+}
+function drawSweet(type, x, y, s, rot) { if (type === "ladoo") drawLadoo(x, y, s); else drawKatli(x, y, s * 1.1, rot); }
+function drawSweetsThali() {
+  const w = SWEETS;
+  drawPlate(w.x, w.y, w.r, true, 0);
+  [[-30, 30], [-44, 8], [-20, 10], [-34, -16], [-10, -34], [-14, 40]].forEach(([dx, dy]) => drawLadoo(w.x + dx, w.y + dy, 1));
+  [[22, -34], [40, -14], [18, -10], [34, 10], [14, 14], [28, 34], [8, -40 + 64]].forEach(([dx, dy], i) => drawKatli(w.x + dx, w.y + dy, 1, (i % 2) * 0.15));
+  ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,240,200,.92)"; ctx.font = "15px 'Tiro Devanagari Hindi', serif";
+  ctx.fillText("मिठाई • Pinch a sweet for bhog", w.x, w.y - w.r - 12);
+  ctx.font = "11px Poppins, sans-serif"; ctx.fillStyle = "rgba(255,240,200,.65)";
+  ctx.fillText("Motichoor ladoo  |  Kaju katli", w.x, w.y + w.r + 18);
+}
+function drawBhog(t) {
+  const b = BHOG;
+  const g = ctx.createLinearGradient(b.x - 42, 0, b.x + 42, 0); g.addColorStop(0, "#8d99a6"); g.addColorStop(0.5, "#ffffff"); g.addColorStop(1, "#8d99a6");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.x, b.y, 44, 13, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#5d6873"; ctx.lineWidth = 1.5; ctx.stroke();
+  S.bhogItems.forEach((it, i) => {
+    const tx = b.x - 26 + (i % 5) * 13, ty = b.y - 4 - Math.floor(i / 5) * 9;
+    const k = clamp((t - it.t) / 500, 0, 1), e = 1 - Math.pow(1 - k, 3);
+    const x = lerp(it.fx, tx, e), y = lerp(it.fy, ty, e) - Math.sin(k * Math.PI) * 40;
+    drawSweet(it.type, x, y, 0.72, it.rot);
+  });
+  if (!S.bhogItems.length) { ctx.fillStyle = "rgba(255,240,200,.7)"; ctx.font = "11px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillText("bhog", b.x, b.y + 4); }
+}
+// a garland of lotus flowers hanging along a curve from (x1,y1) to (x2,y2), dipping by `sag`
+function drawGarland(x1, y1, x2, y2, sag, s, alpha) {
+  const cx = (x1 + x2) / 2, cy = Math.max(y1, y2) + sag * 2;
+  const pt = u => ({ x: (1 - u) * (1 - u) * x1 + 2 * (1 - u) * u * cx + u * u * x2, y: (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * cy + u * u * y2 });
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.strokeStyle = "#2e7d32"; ctx.lineWidth = 3 * s; ctx.beginPath();
+  for (let i = 0; i <= 40; i++) { const p = pt(i / 40); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke();
+  const n = 15;
+  for (let i = 0; i <= n; i++) {
+    const p = pt(i / n);
+    if (i % 2) { ctx.fillStyle = "#43a047"; ctx.beginPath(); ctx.ellipse(p.x, p.y, 6 * s, 3 * s, i, 0, TAU); ctx.fill(); }
+    drawFlower(p.x, p.y, i % 3 === 1 ? "jasmine" : "lotus", (i % 2 ? 0.45 : 0.6) * s, i * 0.6);
+  }
+  // pendant lotus with tassel
+  const b = pt(0.5);
+  ctx.strokeStyle = "#ffd54f"; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x, b.y + 26 * s); ctx.stroke();
+  drawFlower(b.x, b.y + 30 * s, "lotus", 0.95 * s, 0);
+  ctx.fillStyle = "#ffb300"; for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.arc(b.x + k * 3 * s, b.y + 52 * s, 2 * s, 0, TAU); ctx.fill(); }
+  ctx.restore();
+}
+function drawGarlandPeg() {
+  const p = GARLAND_PEG;
+  ctx.fillStyle = "#ffcf5a"; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, TAU); ctx.fill();
+  if (!S.garland.on && !garlandHeld()) {
+    drawGarland(p.x - 32, p.y + 8, p.x + 32, p.y + 8, 62, 1, 1);
+    ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,240,200,.9)"; ctx.font = "14px 'Tiro Devanagari Hindi', serif";
+    ctx.fillText("कमल माला • Lotus garland", p.x, p.y + 146);
+  } else if (!S.garland.on) { ctx.fillStyle = "rgba(255,240,200,.5)"; ctx.font = "12px Poppins, sans-serif"; ctx.textAlign = "center"; ctx.fillText("(garland in hand)", p.x, p.y + 30); }
+}
+function drawGarlandOnLakshmi(t) {
+  if (!S.garland.on) return;
+  const k = clamp((t - S.garland.t) / 600, 0, 1);
+  drawGarland(LK.x - 118, LK.y - 78, LK.x + 118, LK.y - 78, 80 * (0.6 + 0.4 * k), 1.15, k);
+}
+
 // ---------------------------------------------------------------------------
 // Drawing: puja items
 // ---------------------------------------------------------------------------
@@ -804,7 +1004,9 @@ function drawOffered(t) {
   S.falling = S.falling.filter(f => {
     f.vy += 0.3; f.x += f.vx; f.y += f.vy; f.rot += f.vr; f.life++;
     if (f.y > 700) { f.y = 700; f.vy = 0; f.vx *= 0.8; }
-    ctx.globalAlpha = clamp(1 - (f.life - 60) / 40, 0, 1); drawFlower(f.x, f.y, f.type, 1, f.rot); ctx.globalAlpha = 1;
+    ctx.globalAlpha = clamp(1 - (f.life - 60) / 40, 0, 1);
+    if (f.sweet) drawSweet(f.sweet, f.x, f.y, 1, f.rot); else drawFlower(f.x, f.y, f.type, 1, f.rot);
+    ctx.globalAlpha = 1;
     return f.life < 100;
   });
 }
@@ -820,6 +1022,11 @@ function drawParticles() {
       ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
       ctx.fillStyle = "#ffcc33"; ctx.strokeStyle = "#a07000"; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.ellipse(p.x, p.y, p.s * Math.abs(Math.cos(p.rot)) + 1, p.s, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    } else if (p.kind === "note") {
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, 0.6 + 0.4 * Math.abs(Math.sin(p.rot * 1.3)));
+      ctx.fillStyle = p.c; ctx.fillRect(-11, -5, 22, 10); ctx.strokeStyle = "rgba(0,0,0,.3)"; ctx.lineWidth = 0.8; ctx.strokeRect(-11, -5, 22, 10);
+      ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.beginPath(); ctx.arc(0, 0, 3, 0, TAU); ctx.fill(); ctx.restore();
     } else {
       ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = p.kind === "petal" ? a : 1; ctx.fillStyle = p.c;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.beginPath(); ctx.ellipse(0, 0, p.s * 1.6, p.s * 0.8, 0, 0, TAU); ctx.fill(); ctx.restore();
@@ -840,6 +1047,8 @@ function drawCursors(t) {
       ctx.restore();
     }
     if (c.hold && c.hold.type === "flower") drawFlower(c.x, c.y, c.hold.f.type, 1.15, c.hold.f.rot);
+    if (c.hold && c.hold.type === "sweet") drawSweet(c.hold.s, c.x, c.y, 1.25, c.hold.rot);
+    if (c.hold && c.hold.type === "garland") drawGarland(c.x - 34, c.y, c.x + 34, c.y, 45, 0.9, 1);
     ctx.save();
     ctx.shadowColor = "rgba(255,210,90,.9)"; ctx.shadowBlur = 16;
     ctx.strokeStyle = c.pinch ? "#fff6cf" : "rgba(255,215,110,.9)"; ctx.lineWidth = 3;
@@ -870,15 +1079,18 @@ function drawHUD(t) {
     ["Touch the thali", S.steps.touch, ""],
     ["Light the diyas", allLit(), `${litCount()}/${S.diyas.length}`],
     ["Offer flowers", S.steps.flowers >= need, `${Math.min(S.steps.flowers, need)}/${need}`],
+    ["Offer lotus garland", S.steps.garland, ""],
+    ["Offer bhog (sweets)", S.steps.bhog >= CFG.sweetsNeeded, `${Math.min(S.steps.bhog, CFG.sweetsNeeded)}/${CFG.sweetsNeeded}`],
     ["Perform aarti", S.steps.aarti >= rounds, `${Math.min(S.steps.aarti, rounds)}/${rounds}`],
+    ["Dhan blessings (optional)", S.steps.dhan > 0, S.steps.dhan ? "×" + S.steps.dhan : ""],
     ["Play bhajan (optional)", S.steps.bhajan, ""]
   ];
-  ctx.save(); ctx.fillStyle = "rgba(30,5,3,.72)"; rr(x, y, w, 40 + items.length * 26, 14); ctx.fill();
+  ctx.save(); ctx.fillStyle = "rgba(30,5,3,.72)"; rr(x, y, w, 36 + items.length * 24, 14); ctx.fill();
   ctx.strokeStyle = "rgba(230,179,58,.8)"; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.fillStyle = "#ffd36b"; ctx.font = "17px 'Tiro Devanagari Hindi', serif"; ctx.textAlign = "left";
   ctx.fillText("पूजा विधि • Puja Steps", x + 14, y + 26);
   items.forEach(([label, ok, prog], i) => {
-    const yy = y + 52 + i * 26;
+    const yy = y + 50 + i * 24;
     ctx.fillStyle = ok ? "#69f0ae" : "rgba(255,233,176,.5)"; ctx.font = "15px Poppins, sans-serif";
     ctx.fillText(ok ? "✔" : "○", x + 14, yy);
     ctx.fillStyle = ok ? "#e8ffe8" : "#ffe9b0"; ctx.font = "13px Poppins, sans-serif"; ctx.fillText(label, x + 36, yy);
@@ -897,6 +1109,8 @@ function drawHUD(t) {
   else if (!S.steps.touch) hint = "✋ Raise your hand and touch the thali";
   else if (!allLit()) hint = "🕯️ Pinch the candle and bring its flame to each diya on the thali";
   else if (S.steps.flowers < need) hint = "🌼 Pinch a flower from the basket, carry it to Lakshmi ji, and open your fingers";
+  else if (!S.steps.garland) hint = "🪷 Pinch the lotus garland (right) and place it on Lakshmi ji";
+  else if (S.steps.bhog < CFG.sweetsNeeded) hint = "🍬 Pinch a ladoo or kaju katli and offer it to Lakshmi ji (bhog)";
   else if (S.steps.aarti < rounds) hint = "🔄 Pinch and hold the thali, then circle it around Lakshmi ji (aarti)";
   else hint = "🙏 Jai Lakshmi Mata!";
   ctx.save(); ctx.font = "15px Poppins, sans-serif"; const tw = ctx.measureText(hint).width + 40;
@@ -975,7 +1189,8 @@ function updateLogic(t) {
   }
   S.trail.forEach(p => p.age++); S.trail = S.trail.filter(p => p.age < 60);
   // completion
-  if (!S.done && S.steps.touch && allLit() && S.steps.flowers >= CFG.flowersNeeded && S.steps.aarti >= CFG.aartiRounds) {
+  if (!S.done && S.steps.touch && allLit() && S.steps.flowers >= CFG.flowersNeeded && S.steps.garland &&
+      S.steps.bhog >= CFG.sweetsNeeded && S.steps.aarti >= CFG.aartiRounds) {
     S.done = true; S.doneT = t; toast("✨ Shubh Deepavali! May Maa Lakshmi bless you ✨", 6000);
     [0, 450, 900, 1500].forEach((d, i) => setTimeout(() => bell([660, 880, 990, 1320][i], 3, 0.22), d));
     rain("coin", 40); rain("petal2", 40);
@@ -996,8 +1211,9 @@ function frame() {
   updateLogic(t);
 
   drawBackground(t); drawCamBackground(); drawHalo(t); drawMandap(); drawToran(); drawFairyLights(t);
-  drawRangoli(t); drawLakshmi(t); drawPlatform(); drawKalash(490, 466); drawCoins(790, 488);
-  drawBell(t); drawBhajanBtn(t); drawBasket(); drawOffered(t); drawThali(t); drawCandle(t);
+  drawRangoli(t); drawLakshmi(t); drawGarlandOnLakshmi(t); drawPlatform(); drawKalash(490, 466); drawBhog(t);
+  drawBell(t); drawBhajanBtn(t); drawGarlandPeg(); drawBasket(); drawWealthThali(t); drawSweetsThali();
+  drawOffered(t); drawThali(t); drawCandle(t);
   drawParticles(); drawCelebration(t); drawPip(); drawHUD(t); drawCursors(t);
   requestAnimationFrame(frame);
 }

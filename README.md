@@ -34,6 +34,9 @@ Open **http://localhost:8501** (browsers only allow camera access on `localhost`
 | Touch the thali | Hover your hand over it |
 | Light a diya | Hold the candle and bring its flame to the diya's wick |
 | Offer a flower | Pinch in the basket, carry the flower to Lakshmi ji, open your fingers |
+| Offer the lotus garland | Pinch the कमल माला hanging on the right and drop it on Lakshmi ji |
+| Offer bhog | Pinch a motichoor ladoo or kaju katli from the silver mithai thali and drop it on Lakshmi ji |
+| Dhan blessings | Click / pinch the Dhan thali (gold & silver coins, ₹ and $ bundles); each tap grows the stacks and showers wealth |
 | Aarti | Pinch and hold the thali, then move it in full circles around Lakshmi ji |
 | Play / pause the bhajan | Hover over the golden ▶ button for 1 second, or pinch it |
 | Ring the ghanti | Wave your hand through the bell |

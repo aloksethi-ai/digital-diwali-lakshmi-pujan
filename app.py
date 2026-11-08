@@ -118,6 +118,7 @@ with st.sidebar:
     st.markdown("## ⚙️ Puja Settings")
     diyas = st.select_slider("Number of diyas on the thali", options=[1, 3, 5, 7, 9, 11], value=5)
     flowers_needed = st.slider("Flowers to offer", 1, 11, 5)
+    sweets_needed = st.slider("Sweets to offer as bhog", 1, 10, 3, help="Motichoor ladoo / kaju katli placed for Lakshmi ji")
     aarti_rounds = st.slider("Aarti rounds", 1, 7, 3, help="Full circles of the thali around Lakshmi ji")
 
     st.markdown("## ✋ Camera & Hand Tracking")
@@ -183,6 +184,7 @@ config = {
     "name": devotee.strip(),
     "diyas": int(diyas),
     "flowersNeeded": int(flowers_needed),
+    "sweetsNeeded": int(sweets_needed),
     "aartiRounds": int(aarti_rounds),
     "pinch": float(pinch),
     "smooth": float(smooth),
@@ -207,9 +209,12 @@ with c1:
 2. **Touch the thali** with your hand (just hover over it).
 3. **Light the diyas.** Pinch (thumb + index finger) on the 🕯️ candle, carry its flame to each of the **{diyas}** diyas, then open your fingers to put it back.
 4. **Offer flowers.** Pinch inside the flower basket, carry the flower to Lakshmi ji and open your fingers to place it. Offer **{flowers_needed}** flowers.
-5. **Aarti.** Pinch and hold the thali, then move your hand in **{aarti_rounds}** full circles around Lakshmi ji.
-6. **Bhajan.** Hover over the golden ▶ button for one second (or pinch it), or use the top bar.
-7. Wave your hand through the 🔔 **ghanti** to ring it at any time.
+5. **Lotus garland (कमल माला).** Pinch the garland hanging on the right and drop it on Lakshmi ji; it drapes across the centre of her image.
+6. **Bhog.** Pinch a motichoor ladoo or kaju katli from the silver mithai thali and offer **{sweets_needed}** sweets to Lakshmi ji; they go onto the bhog plate.
+7. **Dhan blessings.** Click / pinch the Dhan thali (gold & silver coins, ₹ and $ bundles) on the left. Every tap grows the coin stacks and note bundles and showers wealth on Maa Lakshmi.
+8. **Aarti.** Pinch and hold the thali, then move your hand in **{aarti_rounds}** full circles around Lakshmi ji.
+9. **Bhajan.** Hover over the golden ▶ button for one second (or pinch it), or use the top bar.
+10. Wave your hand through the 🔔 **ghanti** to ring it at any time.
 
 You can use **both hands**, e.g. hold the candle in one hand and the thali in the other.
 No camera? Use **Mouse / Touch only**: press and hold to pick up, release to drop.
