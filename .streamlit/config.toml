@@ -2,7 +2,6 @@
 # Allow bhajan audio files up to ~100 MB to be uploaded and embedded in the stage
 maxUploadSize = 100
 maxMessageSize = 300
-headless = false
 
 [browser]
 gatherUsageStats = false
