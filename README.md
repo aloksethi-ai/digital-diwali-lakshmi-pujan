@@ -3,6 +3,9 @@
 *Conceptualized and Developed by **CA Alok Sethi** using Claude*  
 [LinkedIn](https://www.linkedin.com/in/caaloksethi) · [YouTube @aloksethisir](https://www.youtube.com/@aloksethisir) · [Instagram @caaloksethi](https://www.instagram.com/caaloksethi)
 
+### ▶️ [Open the live app: ca-alok-sethi-diwali-pujan.streamlit.app](https://ca-alok-sethi-diwali-pujan.streamlit.app)
+Runs in your browser with no installation. Allow camera access for hand tracking, or use mouse/touch mode.
+
 An interactive, camera-controlled Lakshmi Pujan. You can pick up a candle and light the diyas
 on a brass thali, offer flowers to Lakshmi ji, perform the aarti by circling the thali, ring
 the ghanti and play your own bhajan, all with hand gestures in front of your webcam.
